@@ -17,6 +17,7 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     REDIS_URL: z.string().url(),
     RESEND: z.string(),
+    RESEND_FROM: z.string(),
   },
 
   /**
@@ -36,6 +37,7 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     RESEND: process.env.RESEND,
+    RESEND_FROM: process.env.RESEND_FROM,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

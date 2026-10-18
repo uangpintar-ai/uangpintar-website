@@ -13,7 +13,7 @@ export type MailerType = {
 
 export const sendEmail = async ({ to, subject, html }: MailerType) => {
   const { data, error } = await resend.emails.send({
-    from: "onboarding@resend.dev",
+    from: env.RESEND_FROM,
     to,
     subject,
     html,
