@@ -230,7 +230,7 @@ const HeroSection = () => {
                       viewBox="0 0 20 20"
                       aria-hidden="true"
                     >
-                      <circle cx="10" cy="10" r="10" fill="#0E5A52" />
+                      <circle cx="10" cy="10" r="10" fill="var(--teal-700)" />
                       <path
                         d="M5.5 10.5l3 3 6-6.5"
                         fill="none"

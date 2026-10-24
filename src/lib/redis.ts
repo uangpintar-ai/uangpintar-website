@@ -12,8 +12,11 @@ const CODE_TTL_SECONDS = 600;
 export const verificationKey = (type: string, identifier: string) =>
   `verify:${type}:${identifier}`;
 
-export const saveVerificationCode = (key: string, code: string) =>
-  redis.set(key, code, "EX", CODE_TTL_SECONDS);
+export const saveVerificationCode = (
+  key: string,
+  code: string,
+  ttlSeconds = CODE_TTL_SECONDS,
+) => redis.set(key, code, "EX", ttlSeconds);
 
 export const getVerificationCode = (key: string) => redis.get(key);
 

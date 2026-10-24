@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
-import { UangPintarLogo, UangPintarWhiteLogoNoBg } from "@/lib/images";
+import { UangPintarWhiteLogoNoBg } from "@/lib/images";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -68,7 +68,14 @@ const LoginForm = () => {
       return;
     }
     toastSuccess("Login Berhasil!", "Selamat datang kembali");
-    router.push("/user");
+    const redirect = new URLSearchParams(window.location.search).get(
+      "redirect",
+    );
+    const target =
+      redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+        ? redirect
+        : "/user";
+    router.push(target);
   };
 
   return (

@@ -1,0 +1,24 @@
+model Payment {
+  id                 String        @id @default(uuid())
+  userId             String
+  plan               String
+  amount             Int
+  status             PaymentStatus @default(PENDING)
+  mayarInvoiceId     String?       @unique
+  mayarTransactionId String?       @unique
+  paidAt             DateTime?
+  setupEmailSentAt   DateTime?
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+}

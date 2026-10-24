@@ -74,7 +74,7 @@ const LandingPageHeader = () => {
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#C9F27A"
+                stroke="var(--lime)"
                 strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
