@@ -1,20 +1,24 @@
 import HeroSection from "./sections/HeroSection";
+import ProblemSection from "./sections/ProblemSection";
+import HowItWorksSection from "./sections/HowItWorksSection";
 import FeaturesSection from "./sections/FeaturesSection";
+import TestimonialsSection from "./sections/TestimonialsSection";
 import PricingSection from "./sections/PricingSection";
 import FAQSection from "./sections/FAQSection";
 import CTASection from "./sections/CTASection";
-import ContactSection from "./sections/ContactSection";
 
 const LandingPageContainer = () => {
   return (
-    <div className="flex flex-col gap-8">
+    <>
       <HeroSection />
+      <ProblemSection />
+      <HowItWorksSection />
       <FeaturesSection />
+      <TestimonialsSection />
       <PricingSection />
-      <FAQSection />
       <CTASection />
-      <ContactSection />
-    </div>
+      <FAQSection />
+    </>
   );
 };
 

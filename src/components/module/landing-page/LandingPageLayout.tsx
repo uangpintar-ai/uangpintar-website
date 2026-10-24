@@ -1,5 +1,7 @@
 import LandingPageHeader from "./LandingPageHeader";
 import LandingPageFooter from "./LandingPageFooter";
+import RevealObserver from "./RevealObserver";
+import "./landing.css";
 
 type Props = {
   children: React.ReactNode;
@@ -7,10 +9,11 @@ type Props = {
 
 const LandingPageLayout = ({ children }: Props) => {
   return (
-    <div className="bg-white">
+    <div className="up-landing">
       <LandingPageHeader />
-      <main className="flex-1">{children}</main>
+      <main>{children}</main>
       <LandingPageFooter />
+      <RevealObserver />
     </div>
   );
 };

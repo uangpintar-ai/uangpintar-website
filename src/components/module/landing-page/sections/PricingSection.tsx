@@ -1,291 +1,321 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { ChartColumn, Check, Mic, NotebookPen, Rocket, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type Benefit = { label: string; disabled?: boolean };
+const fmt = (value: number) => `Rp${value.toLocaleString("id-ID")}`;
 
-const yearlyDiscount = (monthly: string, yearly: string) => {
-  const m = Number(monthly.replace(/[^\d]/g, ""));
-  const y = Number(yearly.replace(/[^\d]/g, ""));
-  return Math.round((1 - y / (m * 12)) * 100);
-};
+const CheckOn = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+    <circle cx="10" cy="10" r="10" fill="#0E5A52" />
+    <path
+      d="M5.5 10.5l3 3 6-6.5"
+      fill="none"
+      stroke="#fff"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
-const trialPlan = {
-  name: "Uji Coba",
-  icon: Rocket,
-  price: "Rp. 0",
-  period: "gratis 7 hari",
-  description: "Cocok buat yang mau coba aplikasi dulu sebelum beli.",
-  benefits: [
-    { label: "Gratis selama 7 hari" },
-    { label: "Unlimited Pencatatan Manual" },
-    { label: "Pencatatan AI Terbatas" },
-    { label: "Pencatatan Lewat Suara" },
-    { label: "Riwayat Catatan Keuangan" },
-  ] as Benefit[],
-  buttonVariant: "outline" as const,
-};
+const CheckLime = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+    <circle cx="10" cy="10" r="10" fill="#C9F27A" />
+    <path
+      d="M5.5 10.5l3 3 6-6.5"
+      fill="none"
+      stroke="#10231F"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
-const paidPlans = [
+const Cross = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+    <circle
+      cx="10"
+      cy="10"
+      r="9"
+      fill="none"
+      stroke="#6B7C76"
+      strokeWidth="1.6"
+    />
+    <path
+      d="M7 7l6 6M13 7l-6 6"
+      fill="none"
+      stroke="#6B7C76"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+const belajar: [boolean, string][] = [
+  [true, "20 transaksi per bulan"],
+  [true, "Riwayat catatan harian, mingguan, dan bulanan"],
+  [true, "Total pemasukan, pengeluaran, dan sisa saldo dalam satu dashboard"],
+  [true, "Kategori dasar"],
+  [true, "Gratis tanpa batas waktu, tanpa kartu kredit"],
+  [false, "Catat lewat suara"],
+  [false, "Foto struk otomatis"],
+  [false, "Analisis keuangan AI"],
+];
+
+const pemula: [boolean, string][] = [
+  [true, "Catat manual tanpa batas"],
+  [true, "150 catatan AI per bulan (suara atau ketik)"],
+  [true, "Catat lewat suara"],
+  [true, "Kategori otomatis oleh AI"],
+  [true, "Riwayat dan dashboard lengkap: pemasukan, pengeluaran, sisa saldo"],
+  [true, "Budget per kategori + peringatan saat pemakaian 80% dan 100%"],
+  [true, "Multi-dompet: tunai, bank, e-wallet"],
+  [true, "Rekap mingguan dan bulanan otomatis"],
+  [true, "Pengingat catat harian"],
+  [true, "Export data ke CSV/Excel"],
+  [true, "Pilih bulanan atau tahunan, batalkan kapan saja"],
+  [false, "Foto struk otomatis (OCR)"],
+  [false, "Analisis keuangan AI"],
+];
+
+const jago = [
+  "Semua fitur Paket Pemula",
+  "500 catatan AI per bulan (suara atau ketik)",
+  "Foto struk belanja otomatis dibaca (OCR)",
+  "Analisis & insight keuangan AI: pola pengeluaran, kategori terboros, perbandingan bulan ini vs bulan lalu",
+  "Tanya AI soal keuanganmu, misalnya \u201cbulan ini paling boros di mana?\u201d (30\u00d7 per bulan)",
+  "Akses lifetime selama layanan Uang Pintar beroperasi",
+  "Bayar sekali, tanpa tagihan bulanan",
+  "Akses lebih awal ke fitur baru",
+  "Ikut voting fitur berikutnya",
+  "Prioritas bantuan",
+];
+
+const costRows = [
   {
-    name: "Paket Ngetik",
-    icon: NotebookPen,
-    monthlyPrice: "Rp. 10.000",
-    yearlyPrice: "Rp. 100.000",
-    description: "Cocok buat yang baru mau mulai mencatat keuangan.",
-    benefits: [
-      { label: "Unlimited Pencatatan Manual" },
-      { label: "500 Pencatatan AI" },
-      { label: "Riwayat Catatan Keuangan" },
-      { label: "Pencatatan Lewat Suara", disabled: true },
-    ] as Benefit[],
-    buttonVariant: "outline" as const,
-    highlighted: true,
+    key: "pm",
+    label: "Pemula bulanan",
+    sub: "Rp20.000 per bulan",
+    fn: (months: number) => 20000 * months,
   },
   {
-    name: "Paket Ngomong",
-    icon: Mic,
-    monthlyPrice: "Rp. 30.000",
-    yearlyPrice: "Rp. 300.000",
-    description: "Cocok buat yang ingin mencatat keuangan tinggal ngomong.",
-    benefits: [
-      { label: "Unlimited Pencatatan Manual" },
-      { label: "500 Pencatatan AI" },
-      { label: "Pencatatan Lewat Suara" },
-      { label: "Riwayat Catatan Keuangan" },
-    ] as Benefit[],
-    buttonVariant: "outline" as const,
+    key: "py",
+    label: "Pemula tahunan",
+    sub: "Rp199.000 per 12 bulan",
+    fn: (months: number) => 199000 * Math.ceil(months / 12),
   },
   {
-    name: "Paket Analisis",
-    icon: ChartColumn,
-    price: "Rp. 500.000",
-    period: "/tahun",
-    description: "Cocok yang ingin mulai serius mengelola keuangan.",
-    benefits: [
-      { label: "Unlimited Pencatatan Manual" },
-      { label: "Unlimited Pencatatan AI" },
-      { label: "Pencatatan Lewat Suara" },
-      { label: "Riwayat Catatan Keuangan" },
-      { label: "Pembagian Dompet Keuangan" },
-      { label: "Analisis Keuangan oleh AI" },
-      { label: "OCR (Tinggal Foto Struk)" },
-    ] as Benefit[],
-    buttonVariant: "outline" as const,
-    disabled: true,
-    yearlyOnly: true,
+    key: "jl",
+    label: "Jago lifetime (promo)",
+    sub: "Rp249.000 sekali bayar",
+    fn: (_months: number) => 249000,
+  },
+  {
+    key: "jy",
+    label: "Jago setelah promo",
+    sub: "Rp299.000 per tahun",
+    fn: (months: number) => 299000 * Math.ceil(months / 12),
   },
 ];
 
+const List = ({ items }: { items: [boolean, string][] }) => (
+  <ul>
+    {items.map(([included, label]) => (
+      <li key={label} className={included ? undefined : "no"}>
+        {included ? <CheckOn /> : <Cross />}
+        <span>{label}</span>
+      </li>
+    ))}
+  </ul>
+);
+
 const PricingSection = () => {
-  const [period, setPeriod] = useState<"bulan" | "tahun">("bulan");
+  const [yearly, setYearly] = useState(false);
+  const [months, setMonths] = useState(12);
+
+  const pemulaPrice = yearly
+    ? {
+        price: "Rp199.000",
+        unit: "/tahun",
+        note: "Hemat 17%, setara \u00b1Rp16.600/bulan",
+      }
+    : {
+        price: "Rp20.000",
+        unit: "/bulan",
+        note: "Atau Rp199.000/tahun, hemat 17%",
+      };
+
+  const values = costRows.map((row) => row.fn(months));
+  const max = Math.max(...values);
+  const min = Math.min(...values);
 
   return (
-    <section
-      id="harga"
-      className="flex flex-col items-center gap-10 px-6 py-16 lg:px-12"
-    >
-      <div className="max-w-xl text-center">
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-dl-foreground lg:text-4xl">
-          Pilih Paket{" "}
-          <span className="bg-gradient-to-r from-dl-gradient-2 via-dl-primary to-dl-gradient-4 bg-clip-text text-transparent">
-            Uang Pintar AI
-          </span>
-        </h2>
-        <p className="mt-3 text-base text-dl-muted">
-          Mulai gratis, upgrade kapan saja sesuai kebutuhanmu.
-        </p>
-      </div>
+    <section className="packs pad" id="paket">
+      <div className="wrap">
+        <div
+          style={{ maxWidth: "680px", margin: "0 auto", textAlign: "center" }}
+        >
+          <div className="eyebrow">Paket</div>
+          <h2 className="title">
+            Mulai gratis. Naik paket kalau sudah terasa manfaatnya.
+          </h2>
+        </div>
 
-      <Tabs
-        value={period}
-        onValueChange={(v) => setPeriod(v as "bulan" | "tahun")}
-        className="flex flex-col items-center gap-6"
-      >
-        <TabsList className="h-11 rounded-full bg-white p-1 gap-1">
-          <TabsTrigger value="bulan" className="rounded-full px-6 py-2">
-            Per Bulan
-          </TabsTrigger>
-          <TabsTrigger value="tahun" className="rounded-full px-6 py-2">
-            Per Tahun
-          </TabsTrigger>
-        </TabsList>
+        <div className="pgrid">
+          <div className="plan free card reveal">
+            <h3>Paket Belajar</h3>
+            <p className="sub">Belajar catat, tanpa risiko.</p>
+            <div className="price">
+              <b>Gratis</b>
+            </div>
+            <div className="note">Tanpa batas waktu</div>
+            <p className="desc">
+              Baru mulai ngatur uang? Mulai dari sini. Catat pemasukan dan
+              pengeluaranmu, lihat sisa saldo, dan rasakan bedanya kalau
+              semuanya rapi.
+            </p>
+            <Link className="btn ghost block cta" href="/register">
+              Daftar Gratis
+            </Link>
+            <List items={belajar} />
+          </div>
 
-        <div className="grid w-full max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {[trialPlan, ...paidPlans]
-            .filter((plan) => {
-              if ("yearlyOnly" in plan && plan.yearlyOnly)
-                return period === "tahun";
-              if (plan.name === "Uji Coba") return period === "bulan";
-              return true;
-            })
-            .map((plan) => {
-              const highlighted = "monthlyPrice" in plan && plan.highlighted;
-              const isDisabled = "disabled" in plan && plan.disabled;
-              const price =
-                "monthlyPrice" in plan
-                  ? period === "bulan"
-                    ? plan.monthlyPrice
-                    : plan.yearlyPrice
-                  : plan.price;
-              const periodLabel =
-                "monthlyPrice" in plan
-                  ? period === "bulan"
-                    ? "/bulan"
-                    : "/tahun"
-                  : plan.period;
+          <div className="plan mid card reveal">
+            <h3>Paket Pemula</h3>
+            <p className="sub">Rajin catat, tanpa dibatasi.</p>
+            <div
+              className="seg"
+              role="group"
+              aria-label="Pilih periode tagihan"
+            >
+              <button
+                type="button"
+                aria-pressed={!yearly}
+                onClick={() => setYearly(false)}
+              >
+                Bulanan
+              </button>
+              <button
+                type="button"
+                aria-pressed={yearly}
+                onClick={() => setYearly(true)}
+              >
+                Tahunan
+              </button>
+            </div>
+            <div className="price" style={{ marginTop: "16px" }}>
+              <b>{pemulaPrice.price}</b>
+              <span className="unit">{pemulaPrice.unit}</span>
+            </div>
+            <div className="note">{pemulaPrice.note}</div>
+            <p className="desc">
+              Waktunya serius. Catat semua secara manual tanpa batas, dan
+              biarkan AI yang kerja: cukup ketik atau ucapkan &ldquo;makan siang
+              25 ribu&rdquo;, langsung tercatat dan masuk kategori yang tepat.
+            </p>
+            <Link className="btn primary block cta" href="/register">
+              Pilih Paket Pemula
+            </Link>
+            <List items={pemula} />
+          </div>
 
-              const benefits = plan.benefits;
+          <div className="plan top card reveal on-dark">
+            <span className="badge">
+              Promo Founder &middot; 50 pengguna pertama
+            </span>
+            <h3>Paket Jago</h3>
+            <p className="sub">Bayar sekali. Uangmu terkendali.</p>
+            <div className="price">
+              <b>Rp249.000</b>
+              <span className="unit">sekali bayar</span>
+            </div>
+            <div className="note">
+              Akses lifetime. Setelah promo: Rp299.000/tahun, tanpa opsi
+              lifetime.
+            </div>
+            <p className="desc">
+              Untuk kamu yang mau uangnya benar-benar terkendali. Semua fitur
+              Paket Pemula, kuota AI lebih besar, ditambah foto struk yang
+              dibaca otomatis dan analisis keuangan AI yang menunjukkan ke mana
+              uangmu bocor.
+            </p>
+            <Link className="btn lime block cta" href="/register">
+              Ambil Promo Founder
+            </Link>
+            <ul>
+              {jago.map((label) => (
+                <li key={label}>
+                  <CheckLime />
+                  <span>{label}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="legal">
+              Analisis AI berupa informasi umum dari data yang kamu catat, bukan
+              nasihat keuangan atau investasi profesional.
+            </p>
+          </div>
+        </div>
 
+        <div className="calc reveal">
+          <h3>Berapa total biayanya kalau kamu pakai lama?</h3>
+          <p className="hint">
+            Geser untuk melihat total biaya kumulatif dari harga yang tertera di
+            halaman ini. Fitur tiap paket berbeda, jadi ini hanya perbandingan
+            biaya, bukan rekomendasi paket.
+          </p>
+          <div className="slider-row">
+            <label htmlFor="months">Lama pemakaian</label>
+            <input
+              type="range"
+              id="months"
+              min="1"
+              max="36"
+              step="1"
+              value={months}
+              onChange={(event) => setMonths(parseInt(event.target.value, 10))}
+            />
+            <output htmlFor="months">{months} bulan</output>
+          </div>
+          <div className="cbars" role="list">
+            {costRows.map((row, index) => {
+              const value = values[index] ?? 0;
+              const best = value === min;
               return (
                 <div
-                  key={plan.name}
-                  className={
-                    highlighted
-                      ? "relative rounded-2xl bg-gradient-to-br from-dl-gradient-2 via-dl-primary to-dl-gradient-4 p-[1.5px] shadow-2xl shadow-dl-primary/25"
-                      : "relative rounded-2xl"
-                  }
+                  className={`cb${best ? " best" : ""}`}
+                  role="listitem"
+                  key={row.key}
                 >
-                  <div
-                    className={`relative flex h-full flex-col gap-6 rounded-2xl border p-6 ${
-                      highlighted
-                        ? "border-transparent bg-white"
-                        : "border-dl-border bg-white"
-                    }`}
-                  >
-                    {plan.name === "Paket Ngomong" && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-dl-foreground px-4 py-1 text-xs font-bold text-white shadow-md">
-                        Tinggal Ngomong
-                      </div>
-                    )}
-
-                    {isDisabled && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-dl-error px-4 py-1 text-xs font-bold text-white shadow-md">
-                        Dalam Pengembangan
-                      </div>
-                    )}
-
-                    <div>
-                      <h3
-                        className={`flex items-center gap-2 text-lg font-bold ${
-                          highlighted ? "text-dl-primary" : "text-dl-foreground"
-                        }`}
-                      >
-                        {"icon" in plan && <plan.icon className="h-5 w-5" />}
-                        {plan.name}
-                      </h3>
-                      <p className="mt-1 text-sm text-dl-muted">
-                        {plan.description}
-                      </p>
-                    </div>
-
-                    <div className="flex items-baseline gap-1">
-                      <span
-                        className={`text-3xl font-extrabold ${
-                          highlighted
-                            ? "bg-gradient-to-r from-dl-gradient-2 to-dl-primary bg-clip-text text-transparent"
-                            : "text-dl-foreground"
-                        }`}
-                      >
-                        {price}
-                      </span>
-                      <span className="text-sm text-dl-muted">
-                        {periodLabel}
-                      </span>
-                    </div>
-
-                    {"monthlyPrice" in plan && (
-                      <p className="-mt-4 text-xs font-semibold text-dl-primary">
-                        {period === "tahun" ? (
-                          <>
-                            Setara{" "}
-                            {(
-                              Number(plan.yearlyPrice.replace(/[^\d]/g, "")) /
-                              12
-                            ).toLocaleString("id-ID", {
-                              style: "currency",
-                              currency: "IDR",
-                              maximumFractionDigits: 0,
-                            })}
-                            /bulan — hemat{" "}
-                            {yearlyDiscount(
-                              plan.monthlyPrice,
-                              plan.yearlyPrice,
-                            )}
-                            %
-                          </>
-                        ) : (
-                          <>
-                            Hemat{" "}
-                            {yearlyDiscount(
-                              plan.monthlyPrice,
-                              plan.yearlyPrice,
-                            )}
-                            % dengan paket tahunan
-                          </>
-                        )}
-                      </p>
-                    )}
-
-                    <ul className="flex flex-col gap-3">
-                      {benefits.map((benefit) => {
-                        const disabled = benefit.disabled;
-                        return (
-                          <li
-                            key={benefit.label}
-                            className="flex items-start gap-3"
-                          >
-                            <div
-                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                                disabled
-                                  ? "bg-dl-error/10 text-dl-error"
-                                  : highlighted
-                                    ? "bg-gradient-to-br from-dl-gradient-2 to-dl-primary text-white"
-                                    : "bg-dl-primary/10 text-dl-primary"
-                              }`}
-                            >
-                              {disabled ? (
-                                <X className="h-3 w-3" />
-                              ) : (
-                                <Check className="h-3 w-3" />
-                              )}
-                            </div>
-                            <span
-                              className={`text-sm leading-relaxed ${
-                                disabled
-                                  ? "text-dl-muted"
-                                  : highlighted
-                                    ? "text-dl-foreground"
-                                    : "text-dl-muted"
-                              }`}
-                            >
-                              {benefit.label}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-
-                    <Button
-                      variant={plan.buttonVariant}
-                      disabled={isDisabled}
-                      className={`mt-auto h-12 w-full rounded-xl text-base font-semibold ${
-                        highlighted
-                          ? "bg-gradient-to-r from-dl-gradient-2 to-dl-primary text-white shadow-lg shadow-dl-primary/25 hover:brightness-110"
-                          : "border-dl-border text-dl-foreground hover:border-dl-primary/50 hover:bg-gradient-to-r hover:from-dl-gradient-1/10 hover:via-dl-gradient-2/10 hover:to-dl-primary/10 hover:text-dl-primary hover:shadow-lg hover:shadow-dl-primary/15 transition-all duration-300"
-                      }`}
-                    >
-                      {plan.name === "Uji Coba" ? "Coba Gratis" : "Pilih Paket"}
-                    </Button>
+                  <div className="lbl">
+                    {row.label}
+                    <small>{row.sub}</small>
+                  </div>
+                  <div className="track">
+                    <i
+                      style={{
+                        width: `${Math.max(4, Math.round((value / max) * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="val">
+                    {fmt(value)}
+                    {best && <span className="star">Termurah</span>}
                   </div>
                 </div>
               );
             })}
+          </div>
+          <p className="cnote">
+            Asumsi hitungan: Pemula bulanan Rp20.000 per bulan. Pemula tahunan
+            Rp199.000 per 12 bulan, dibayar di muka. Jago lifetime Rp249.000
+            sekali bayar selama promo 50 slot, setelah itu Rp299.000 per tahun.
+            Harga dan promo bisa berubah.
+          </p>
         </div>
-      </Tabs>
+      </div>
     </section>
   );
 };
