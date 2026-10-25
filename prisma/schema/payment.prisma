@@ -3,6 +3,9 @@ model Payment {
   userId             String
   plan               String
   amount             Int
+  mobile             String?
+  link               String?
+  expiresAt          DateTime?
   status             PaymentStatus @default(PENDING)
   mayarInvoiceId     String?       @unique
   mayarTransactionId String?       @unique

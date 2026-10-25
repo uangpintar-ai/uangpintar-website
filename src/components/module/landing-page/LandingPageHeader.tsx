@@ -1,7 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { SessionProvider, useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
+import { UangPintarLogoNoBg } from "@/lib/images";
 
 const navLinks = [
   { label: "Cara kerja", href: "#cara-kerja", id: "cara-kerja" },
@@ -10,7 +13,8 @@ const navLinks = [
   { label: "FAQ", href: "#faq", id: "faq" },
 ];
 
-const LandingPageHeader = () => {
+const LandingPageHeaderContent = () => {
+  const { data: session, status } = useSession();
   const [scrolled, setScrolled] = useState(false);
   const [active, setActive] = useState("");
   const progressRef = useRef<HTMLElement>(null);
@@ -68,21 +72,13 @@ const LandingPageHeader = () => {
       <header className={`site-header${scrolled ? " scrolled" : ""}`}>
         <div className="nav">
           <a href="#hero" className="brand">
-            <span className="mark">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--lime)"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M4 12.5l5 5L20 6.5" />
-              </svg>
-            </span>
+            <Image
+              src={UangPintarLogoNoBg}
+              alt="Uang Pintar AI"
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain"
+            />
             Uang Pintar AI
           </a>
           <nav className="links" aria-label="Navigasi utama">
@@ -95,14 +91,31 @@ const LandingPageHeader = () => {
                 {link.label}
               </a>
             ))}
-            <Link className="btn primary sm" href="/login">
-              Mulai Gratis
-            </Link>
+            {status === "authenticated" ? (
+              <Link
+                className="btn primary sm"
+                href={
+                  session.user.role === "ADMIN" ? "/tdibmkr" : "/user/dashboard"
+                }
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <Link className="btn primary sm" href="/login">
+                Mulai Gratis
+              </Link>
+            )}
           </nav>
         </div>
       </header>
     </>
   );
 };
+
+const LandingPageHeader = () => (
+  <SessionProvider>
+    <LandingPageHeaderContent />
+  </SessionProvider>
+);
 
 export default LandingPageHeader;

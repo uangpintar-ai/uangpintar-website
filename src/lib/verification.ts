@@ -17,13 +17,7 @@ const getBaseUrl = () => {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 };
 
-export const sendPasswordSetupEmail = async ({
-  email,
-  userId,
-}: {
-  email: string;
-  userId: string;
-}) => {
+export const createPasswordSetupLink = async (userId: string) => {
   const code = randomInt(100000, 999999).toString();
 
   await saveVerificationCode(
@@ -32,10 +26,24 @@ export const sendPasswordSetupEmail = async ({
     SETUP_PASSWORD_TTL_SECONDS,
   );
 
-  const link = `${getBaseUrl()}/update-password?code=${code}&user_id=${encodeURIComponent(
+  return `${getBaseUrl()}/update-password?code=${code}&user_id=${encodeURIComponent(
     userId,
   )}`;
+};
 
-  const { subject, html } = generatePasswordSetupEmail(link);
+export const sendPasswordSetupEmail = async ({
+  email,
+  userId,
+  link,
+}: {
+  email: string;
+  userId: string;
+  link?: string;
+}) => {
+  const setupLink = link ?? (await createPasswordSetupLink(userId));
+
+  const { subject, html } = generatePasswordSetupEmail(setupLink);
   await sendEmail({ to: [email], subject, html });
+
+  return setupLink;
 };

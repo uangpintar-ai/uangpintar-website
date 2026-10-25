@@ -158,8 +158,8 @@ const HeroSection = () => {
             </a>
           </div>
           <p className="fine">
-            Gratis tanpa batas waktu untuk 20 transaksi per bulan. Tanpa kartu
-            kredit.
+            Gratis tanpa batas waktu untuk 20x catat transaksi oleh AI per
+            bulan. Tanpa kartu kredit.
           </p>
         </div>
 

@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
   const email = str(body?.email).trim().toLowerCase();
   const firstName = str(body?.first_name).trim();
   const lastName = str(body?.last_name).trim();
+  const phone = str(body?.phone).replace(/[\s-]/g, "");
   const password = str(body?.password);
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -20,13 +21,24 @@ export async function POST(req: NextRequest) {
   if (lastName.length < 1 || lastName.length > 30) {
     return fail("Nama belakang harus 1-30 karakter", 400);
   }
+  if (!/^\+?\d{10,15}$/.test(phone)) {
+    return fail("Nomor HP tidak valid", 400);
+  }
   if (password.length < 8 || password.length > 100) {
     return fail("Password minimal 8 karakter", 400);
   }
 
-  const existing = await db.user.findUnique({ where: { email } });
+  const existing = await db.user.findFirst({
+    where: { OR: [{ email }, { phone }] },
+    select: { email: true },
+  });
   if (existing) {
-    return fail("Email sudah terdaftar", 409);
+    return fail(
+      existing.email === email
+        ? "Email sudah terdaftar"
+        : "Nomor HP sudah terdaftar",
+      409,
+    );
   }
 
   const hash = await bcrypt.hash(password, 10);
@@ -35,8 +47,9 @@ export async function POST(req: NextRequest) {
       email,
       firstName,
       lastName,
+      phone,
       password: hash,
-      maxAISession: 100,
+      maxAISession: 20,
       packageStart: new Date(),
       packageRnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },

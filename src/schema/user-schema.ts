@@ -11,6 +11,10 @@ export const registerSchema = z.object({
     .string()
     .min(1, "Last name harus diisi")
     .max(30, "Last name max 30 karakter"),
+  phone: z
+    .string()
+    .min(1, "Nomor HP harus diisi")
+    .regex(/^\+?[0-9\s-]{10,18}$/, "Nomor HP tidak valid"),
   password: z
     .string()
     .min(8, "Password minimal 8 karakter")

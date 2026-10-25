@@ -58,6 +58,7 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       try {
         const hash = await bcrypt.hash(input.password, 10);
+        const phone = input.phone.replace(/[\s-]/g, "");
         await ctx.db.$transaction(async (tx) => {
           const existing = await tx.user.findUnique({
             where: { email: input.email },
@@ -68,13 +69,24 @@ export const userRouter = createTRPCRouter({
               message: "Email sudah terdaftar",
             });
           }
+          const phoneTaken = await tx.user.findUnique({
+            where: { phone },
+            select: { id: true },
+          });
+          if (phoneTaken) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Nomor HP sudah terdaftar",
+            });
+          }
           await tx.user.create({
             data: {
               email: input.email,
               firstName: input.first_name,
               lastName: input.last_name,
+              phone,
               password: hash,
-              maxAISession: 100,
+              maxAISession: 20,
               packageStart: new Date(),
               packageRnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             },
@@ -231,7 +243,7 @@ export const userRouter = createTRPCRouter({
         if (input.type === "register") {
           await ctx.db.user.update({
             where: { email: input.identifier },
-            data: { status: "UJI_COBA" },
+            data: { status: "GRATIS" },
           });
         }
 
@@ -291,6 +303,7 @@ export const userRouter = createTRPCRouter({
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.userId! },
       select: {
+        phone: true,
         packageStart: true,
         packageRnd: true,
         aiSessionCount: true,

@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const user = await db.user.update({
     where: { email },
-    data: { status: "UJI_COBA" },
+    data: { status: "GRATIS" },
   });
 
   const token = await signMobileToken({

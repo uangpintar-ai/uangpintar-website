@@ -8,22 +8,13 @@ import { z } from "zod";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import PaymentDialog from "@/components/module/checkout/PaymentDialog";
 import {
   Form,
   FormControl,
@@ -34,7 +25,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { cn, formatCurrency } from "@/lib/utils";
-import { toastError } from "@/lib/toast";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { checkoutLeadSchema } from "@/schema/payment-schema";
 import { PLANS, type PlanId } from "@/const/payment";
 
@@ -58,9 +49,9 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [data, setData] = useState<PurchaseSchema | null>(null);
-  const [invoice, setInvoice] = useState<{ link: string } | null>(null);
-  const [confirmClose, setConfirmClose] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [error, setError] = useState("");
 
   const form = useForm<PurchaseSchema>({
@@ -77,18 +68,52 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
     if (!open) {
       setStep(1);
       setData(null);
-      setInvoice(null);
-      setConfirmClose(false);
+      setLink(null);
       setLoading(false);
+      setCheckingEmail(false);
       setError("");
       form.reset();
     }
   }, [open]);
 
-  const submitData = form.handleSubmit((values) => {
-    setData(values);
+  const submitData = form.handleSubmit(async (values) => {
     setError("");
-    setStep(2);
+    setCheckingEmail(true);
+
+    try {
+      const response = await fetch("/api/checkout/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: values.email }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        emailValid?: boolean;
+        registered?: boolean;
+        message?: string;
+      } | null;
+
+      if (!response.ok || !payload) {
+        throw new Error(payload?.message ?? "Gagal memeriksa email.");
+      }
+
+      if (!payload.emailValid || payload.registered) {
+        form.setError("email", {
+          message: payload.message ?? "Email tidak dapat digunakan.",
+        });
+        return;
+      }
+
+      setData(values);
+      setStep(2);
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Gagal memeriksa email.";
+      setError(message);
+      toastError("Gagal", message);
+    } finally {
+      setCheckingEmail(false);
+    }
   });
 
   const checkout = async () => {
@@ -123,7 +148,7 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
         throw new Error("Link pembayaran tidak valid.");
       }
 
-      setInvoice({ link: payload.link });
+      setLink(payload.link);
     } catch (caught) {
       const message =
         caught instanceof Error
@@ -136,10 +161,64 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
     }
   };
 
+  const skipPayment = async () => {
+    if (!plan || !data) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/mayar/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plan: plan.id,
+          mobile: data.mobile,
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          skip_payment: true,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        setupUrl?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? "Gagal melewati pembayaran.");
+      }
+
+      if (payload?.setupUrl) {
+        console.info("[dev] Link atur kata sandi:", payload.setupUrl);
+        toastSuccess(
+          "Pembayaran dilewati",
+          "Membuka halaman atur kata sandi (development).",
+        );
+        window.location.href = payload.setupUrl;
+        return;
+      }
+
+      toastSuccess(
+        "Pembayaran dilewati",
+        "Paket langsung aktif (mode development). Cek email untuk mengatur kata sandi jika akun baru.",
+      );
+      onClose();
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Gagal melewati pembayaran.";
+      setError(message);
+      toastError("Gagal", message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <Dialog
-        open={open && !invoice}
+        open={open && !link}
         onOpenChange={(next) => {
           if (!next) onClose();
         }}
@@ -218,6 +297,10 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
                               placeholder="email@contoh.com"
                               autoComplete="email"
                               {...field}
+                              onChange={(event) => {
+                                field.onChange(event);
+                                form.clearErrors("email");
+                              }}
                             />
                           </FormControl>
                           <FormMessage />
@@ -284,9 +367,12 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
 
                     <Button
                       type="submit"
+                      disabled={checkingEmail}
                       className="h-11 w-full rounded-xl bg-dl-primary text-base font-semibold text-white hover:bg-dl-primary/90"
                     >
-                      Lanjut ke Ringkasan
+                      {checkingEmail
+                        ? "Memeriksa email..."
+                        : "Lanjut ke Ringkasan"}
                     </Button>
                   </form>
                 </Form>
@@ -356,6 +442,20 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
                     {loading ? "Menyiapkan pembayaran..." : "Checkout"}
                   </Button>
 
+                  {process.env.NODE_ENV === "development" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        void skipPayment();
+                      }}
+                      disabled={loading}
+                      className="h-10 w-full rounded-xl border-dashed border-dl-border text-dl-muted"
+                    >
+                      Lewati Pembayaran (Development)
+                    </Button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => {
@@ -373,51 +473,7 @@ const PurchaseModal = ({ planId, onClose }: Props) => {
         )}
       </Dialog>
 
-      <Dialog
-        open={Boolean(invoice)}
-        onOpenChange={(next) => {
-          if (!next) setConfirmClose(true);
-        }}
-      >
-        {invoice && (
-          <DialogContent
-            showCloseButton={false}
-            className="h-[85vh] w-fit max-w-[calc(100vw-2rem)] gap-0 overflow-hidden border-0 bg-white p-0"
-          >
-            <DialogTitle className="sr-only">Pembayaran Mayar</DialogTitle>
-            <DialogDescription className="sr-only">
-              Halaman pembayaran Mayar
-            </DialogDescription>
-            <iframe
-              src={invoice.link}
-              title="Pembayaran Mayar"
-              allow="payment"
-              className="h-full w-[420px] max-w-full border-0"
-            />
-          </DialogContent>
-        )}
-      </Dialog>
-
-      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
-        <AlertDialogContent className="bg-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Tutup pembayaran?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Pembayaran belum selesai. Kalau ditutup, kamu harus memulai
-              checkout lagi.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={onClose}
-              className="bg-dl-error text-white hover:bg-dl-error/90"
-            >
-              Tutup
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PaymentDialog link={link} onClose={onClose} />
     </>
   );
 };

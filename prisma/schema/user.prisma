@@ -3,6 +3,7 @@ model User {
   email          String          @unique
   firstName      String
   lastName       String
+  phone          String          @unique
   password       String?
   balance        Float           @default(0)
   aiSessionCount Int             @default(0)
@@ -26,9 +27,10 @@ enum Role {
 
 enum UserStatus {
   UNVERIFIED
-  UJI_COBA
-  PINTAR_NGETIK
-  PINTAR_NGOMONG
+  GRATIS
+  PEMULA_BULANAN
+  PEMULA_TAHUNAN
+  PAKET_JAGO
   INACTIVE
   SUSPENDED
 }

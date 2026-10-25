@@ -586,7 +586,7 @@ const TransactionCard = ({
 const AIChatRoom = () => {
   const router = useRouter();
   const { data: session } = useSession();
-  const isFreeTier = session?.user?.status === "FREE_TIER";
+  const isFreeTier = session?.user?.status === "GRATIS";
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);

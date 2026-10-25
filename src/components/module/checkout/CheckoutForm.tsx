@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { toastError } from "@/lib/toast";
 import type { PlanId } from "@/const/payment";
@@ -23,6 +22,8 @@ type Props = {
   };
   embedded?: boolean;
   onUnauthorized?: () => void;
+  onInvoiceLink?: (link: string, paymentId?: string) => void;
+  onSkipped?: () => void;
 };
 
 const CheckoutForm = ({
@@ -35,19 +36,19 @@ const CheckoutForm = ({
   customer,
   embedded = false,
   onUnauthorized,
+  onInvoiceLink,
+  onSkipped,
 }: Props) => {
-  const [mobile, setMobile] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("");
+    void checkout();
+  };
 
-    if (!/^\+?[0-9\s-]{10,18}$/.test(mobile.trim())) {
-      setError("Masukkan nomor WhatsApp yang valid.");
-      return;
-    }
+  const checkout = async (skipPayment = false) => {
+    setError("");
 
     setLoading(true);
 
@@ -57,7 +58,6 @@ const CheckoutForm = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           plan: planId,
-          mobile,
           ...(customer
             ? {
                 email: customer.email,
@@ -65,11 +65,13 @@ const CheckoutForm = ({
                 last_name: customer.lastName,
               }
             : {}),
+          ...(skipPayment ? { skip_payment: true } : {}),
         }),
       });
 
       const data = (await response.json().catch(() => null)) as {
         link?: string;
+        paymentId?: string;
         message?: string;
       } | null;
 
@@ -89,8 +91,20 @@ const CheckoutForm = ({
         throw new Error(data?.message ?? "Gagal membuat pembayaran.");
       }
 
+      if (skipPayment) {
+        onSkipped?.();
+        setLoading(false);
+        return;
+      }
+
       if (!data?.link?.startsWith("https://")) {
         throw new Error("Link pembayaran tidak valid.");
+      }
+
+      if (onInvoiceLink) {
+        onInvoiceLink(data.link, data.paymentId);
+        setLoading(false);
+        return;
       }
 
       window.location.href = data.link;
@@ -135,33 +149,6 @@ const CheckoutForm = ({
       </div>
 
       <form onSubmit={submit} className="mt-6 space-y-4">
-        <div>
-          <label
-            htmlFor="mobile"
-            className="mb-2 block text-sm font-semibold text-dl-foreground"
-          >
-            Nomor WhatsApp
-          </label>
-          <Input
-            id="mobile"
-            name="mobile"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder="08xxxxxxxxxx"
-            value={mobile}
-            onChange={(event) => {
-              setMobile(event.target.value);
-              setError("");
-            }}
-            className="h-12 bg-white"
-            required
-          />
-          <p className="mt-1 text-xs text-dl-muted">
-            Dipakai untuk mengirim bukti dan pengingat pembayaran.
-          </p>
-        </div>
-
         {error && <p className="text-sm font-medium text-dl-error">{error}</p>}
 
         <Button
@@ -178,12 +165,25 @@ const CheckoutForm = ({
             "Lanjut ke Pembayaran"
           )}
         </Button>
+
+        {process.env.NODE_ENV === "development" && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loading}
+            onClick={() => {
+              void checkout(true);
+            }}
+            className="h-11 w-full rounded-xl border-dashed border-dl-border text-dl-muted"
+          >
+            Lewati Pembayaran (Development)
+          </Button>
+        )}
       </form>
 
       <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-dl-muted">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-dl-primary" />
-        Pembayaran diproses aman oleh Mayar. Paket aktif otomatis setelah
-        pembayaran berhasil.
+        Paket aktif otomatis setelah pembayaran berhasil.
       </p>
     </>
   );

@@ -11,6 +11,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  Phone,
   Shield,
   User,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { api } from "@/trpc/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { getPackageLabel } from "@/const/general/package-label";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -131,15 +133,21 @@ const UserProfile = () => {
                 </span>
               </div>
               <div className="flex items-center gap-2 text-dl-muted">
+                <Phone className="h-4 w-4 text-dl-primary" />
+                <span className="break-all text-dl-foreground">
+                  {profile?.phone ?? "-"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-dl-muted">
                 <Shield className="h-4 w-4 text-dl-primary" />
                 <span className="text-dl-foreground">
                   {mounted ? (
                     <Badge variant="blue" className="rounded-md text-[10px]">
-                      {session?.user?.status ?? "UNVERIFIED"}
+                      {getPackageLabel(session?.user?.status)}
                     </Badge>
                   ) : (
                     <Badge variant="blue" className="rounded-md text-[10px]">
-                      UNVERIFIED
+                      {getPackageLabel("UNVERIFIED")}
                     </Badge>
                   )}
                 </span>

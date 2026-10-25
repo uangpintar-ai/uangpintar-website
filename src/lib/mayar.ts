@@ -41,6 +41,7 @@ export const createMayarInvoice = async (input: {
   email: string;
   mobile: string;
   orderId: string;
+  expiresAt?: Date;
 }) => {
   const plan = PLANS[input.plan];
 
@@ -52,7 +53,9 @@ export const createMayarInvoice = async (input: {
       email: input.email,
       mobile: input.mobile,
       description: plan.description,
-      expiredAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      expiredAt: (
+        input.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000)
+      ).toISOString(),
       items: [
         {
           quantity: 1,

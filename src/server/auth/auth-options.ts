@@ -65,7 +65,7 @@ export const authOptions: NextAuthOptions = {
             where: { email },
           });
 
-          if (!user || !user.password) return null;
+          if (!user?.password) return null;
 
           if (!isRetoken) {
             const isValid = await bcrypt.compare(password, user.password);
@@ -150,7 +150,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/app/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.userId = user.userId;
@@ -160,6 +160,28 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.status = user.status;
       }
+
+      if (trigger === "update" && token.userId) {
+        const dbUser = await db.user.findUnique({
+          where: { id: token.userId },
+          select: {
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+          },
+        });
+
+        if (dbUser) {
+          token.email = dbUser.email;
+          token.firstName = dbUser.firstName;
+          token.lastName = dbUser.lastName;
+          token.role = dbUser.role;
+          token.status = dbUser.status;
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {

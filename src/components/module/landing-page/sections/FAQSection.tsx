@@ -10,12 +10,12 @@ const faq: [string, string][] = [
     "Ucapkan atau ketik seperti biasa, misalnya \u201cbeli bensin 30 ribu\u201d. AI membaca nominal dan jenis transaksinya, lalu mencatatnya untukmu. Pencatatan lewat suara tersedia di Paket Pemula dan Paket Jago.",
   ],
   [
-    "Apa bedanya Paket Belajar, Pemula, dan Jago?",
-    "Belajar gratis dengan 20 transaksi per bulan. Pemula membuka catat manual tanpa batas, 150 catatan AI per bulan, dan pencatatan lewat suara. Jago menambah kuota menjadi 500 catatan AI per bulan, foto struk otomatis, dan analisis keuangan AI.",
+    "Apa bedanya Paket Gratis, Pemula, dan Jago?",
+    "Gratis: catat transaksi manual tanpa batas dan 20x catat transaksi oleh AI per bulan. Pemula membuka 300x catat transaksi oleh AI per bulan (suara atau ketik). Jago menambah kuota menjadi 500x catat transaksi oleh AI per bulan, foto struk otomatis, dan analisis keuangan AI.",
   ],
   [
     "Bagaimana kalau kuota catatan AI habis?",
-    "Catat manual tetap bisa dipakai tanpa batas di Paket Pemula dan Jago. Kuota AI diperbarui setiap bulan. Di Paket Belajar, batasnya 20 transaksi per bulan.",
+    "Catat manual tetap bisa dipakai tanpa batas di semua paket. Kuota AI diperbarui setiap bulan. Di Paket Gratis, batasnya 20x catat transaksi oleh AI per bulan.",
   ],
   [
     "Apa arti \u201clifetime\u201d di Paket Jago?",

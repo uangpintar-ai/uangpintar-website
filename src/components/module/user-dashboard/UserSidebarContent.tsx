@@ -7,6 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 import {
   Home,
   NotebookPen,
+  Receipt,
   Sparkles,
   User,
   LogOut,
@@ -14,6 +15,7 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { UangPintarLogoNoBg } from "@/lib/images";
+import { getPackageLabel } from "@/const/general/package-label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,11 @@ const navItems = [
     label: "Catat dengan AI",
     href: "/user",
     icon: Sparkles,
+  },
+  {
+    label: "Riwayat Pembayaran",
+    href: "/user/payment-history",
+    icon: Receipt,
   },
   { label: "Profil", href: "/user/profile", icon: User },
 ];
@@ -144,12 +151,21 @@ const UserSidebarContent = ({
               <p className="truncate text-sm font-semibold text-dl-foreground">
                 {displayName}
               </p>
-              <Badge
-                variant="blue"
-                className="mt-1 truncate rounded-md text-[10px]"
+              <Link
+                href="/user/upgrade"
+                onClick={onNavigate}
+                aria-label="Upgrade paket"
+                className="mt-1 inline-flex cursor-pointer"
               >
-                {session?.user?.status ?? "AI"}
-              </Badge>
+                <Badge
+                  variant="blue"
+                  className="truncate rounded-md text-[10px] transition-colors hover:bg-blue-100"
+                >
+                  {session?.user?.status
+                    ? getPackageLabel(session.user.status)
+                    : "AI"}
+                </Badge>
+              </Link>
             </div>
           )}
           {!collapsed && (

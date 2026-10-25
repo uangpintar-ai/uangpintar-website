@@ -29,21 +29,23 @@ const statusVariant: Record<
   string,
   "green" | "yellow" | "blue" | "destructive" | "secondary"
 > = {
-  FREE_TIER: "blue",
-  MONTHLY_SUBSCRIPTION: "green",
-  YEARLY_SUBSCRIPTION: "green",
   UNVERIFIED: "yellow",
+  GRATIS: "blue",
+  PEMULA_BULANAN: "green",
+  PEMULA_TAHUNAN: "green",
+  PAKET_JAGO: "green",
   INACTIVE: "secondary",
   SUSPENDED: "destructive",
 };
 
 const statusLabel: Record<string, string> = {
-  FREE_TIER: "Free Tier",
-  MONTHLY_SUBSCRIPTION: "Monthly",
-  YEARLY_SUBSCRIPTION: "Yearly",
-  UNVERIFIED: "Unverified",
-  INACTIVE: "Inactive",
-  SUSPENDED: "Suspended",
+  UNVERIFIED: "Belum Terverifikasi",
+  GRATIS: "Gratis",
+  PEMULA_BULANAN: "Pemula Bulanan",
+  PEMULA_TAHUNAN: "Pemula Tahunan",
+  PAKET_JAGO: "Paket Jago",
+  INACTIVE: "Tidak Aktif",
+  SUSPENDED: "Ditangguhkan",
 };
 
 const UserData = () => {

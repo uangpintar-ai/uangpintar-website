@@ -6,8 +6,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Loader2, Lock, Mail, UserRound } from "lucide-react";
-import { UangPintarLogo, UangPintarWhiteLogoNoBg } from "@/lib/images";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  Phone,
+  UserRound,
+} from "lucide-react";
+import { UangPintarWhiteLogoNoBg } from "@/lib/images";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -32,6 +40,7 @@ const RegisterForm = () => {
       email: "",
       first_name: "",
       last_name: "",
+      phone: "",
       password: "",
     },
   });
@@ -87,6 +96,28 @@ const RegisterForm = () => {
                     <Input
                       type="email"
                       placeholder="Masukkan email"
+                      className="bg-white pl-9"
+                      {...field}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-white">Nomor HP</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dl-muted" />
+                    <Input
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="08xxxxxxxxxx"
                       className="bg-white pl-9"
                       {...field}
                     />

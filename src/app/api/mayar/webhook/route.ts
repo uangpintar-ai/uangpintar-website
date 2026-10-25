@@ -1,11 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/server/db";
-import { isPlanId, PLANS } from "@/const/payment";
+import { isPlanId } from "@/const/payment";
 import { getMayarInvoice, isValidMayarWebhookToken } from "@/lib/mayar";
 import { sendPasswordSetupEmail } from "@/lib/verification";
-
-const LIFETIME_END = new Date("2099-12-31T23:59:59.999Z");
+import { applyPlan } from "@/server/services/payment-service";
 
 const sendSetupEmailIfNeeded = async (paymentId: string) => {
   const payment = await db.payment.findUnique({
@@ -143,7 +142,7 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ ok: true });
   }
 
-  const plan = PLANS[payment.plan];
+  const planId = payment.plan;
 
   await db.$transaction(async (tx) => {
     const claimed = await tx.payment.updateMany({
@@ -157,31 +156,7 @@ export const POST = async (request: NextRequest) => {
 
     if (claimed.count === 0) return;
 
-    const user = await tx.user.findUnique({
-      where: { id: payment.userId },
-      select: { packageStart: true, packageRnd: true },
-    });
-
-    if (!user) return;
-
-    const now = new Date();
-    const active = user.packageRnd.getTime() > now.getTime();
-    const base = active ? user.packageRnd : now;
-    const end =
-      plan.durationDays === null
-        ? LIFETIME_END
-        : new Date(base.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
-
-    await tx.user.update({
-      where: { id: payment.userId },
-      data: {
-        status: plan.status,
-        maxAISession: plan.maxAISession,
-        aiSessionCount: 0,
-        packageStart: active ? user.packageStart : now,
-        packageRnd: end,
-      },
-    });
+    await applyPlan(tx, payment.userId, planId);
   });
 
   try {

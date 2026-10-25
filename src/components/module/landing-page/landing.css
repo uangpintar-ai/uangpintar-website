@@ -53,7 +53,7 @@
 }
 
 .up-landing .wrap {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 20px;
 }
@@ -124,7 +124,7 @@
   justify-content: space-between;
   gap: 8px 24px;
   padding: 12px 20px;
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -780,47 +780,6 @@
   text-align: center;
 }
 
-.up-landing .filters {
-  margin-top: 28px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.up-landing .fbtn {
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 999px;
-  border: 2px solid var(--line);
-  background: #fff;
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
-}
-
-.up-landing .fbtn:hover {
-  border-color: var(--teal-700);
-}
-
-.up-landing .fbtn[aria-pressed="true"] {
-  background: var(--teal-700);
-  border-color: var(--teal-700);
-  color: #fff;
-}
-
-.up-landing .fnote {
-  margin: 12px 0 0;
-  font-size: 14px;
-  color: var(--muted);
-  min-height: 20px;
-}
-
 .up-landing .bgrid {
   margin-top: 24px;
   display: flex;
@@ -951,12 +910,20 @@
   background: var(--mint);
 }
 
+.up-landing.pricing-cards {
+  background: transparent;
+}
+
 .up-landing .pgrid {
   margin-top: 48px;
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: 24px;
+}
+
+.up-landing .pgrid.flush {
+  margin-top: 0;
 }
 
 .up-landing .plan {

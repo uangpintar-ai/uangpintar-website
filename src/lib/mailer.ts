@@ -21,6 +21,17 @@ export const sendEmail = async ({ to, subject, html }: MailerType) => {
   if (error || !data?.id) {
     throw new Error(error?.message ?? "Gagal mengirim email");
   }
+  if (process.env.NODE_ENV === "development") {
+    console.info(
+      "[resend] email accepted",
+      JSON.stringify({
+        id: data.id,
+        from: env.RESEND_FROM,
+        to,
+        subject,
+      }),
+    );
+  }
   return data;
 };
 
