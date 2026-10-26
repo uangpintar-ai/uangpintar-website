@@ -16,6 +16,7 @@ export const transactionCreateSchema = z.object({
   category: z.enum(["INCOME", "EXPENSE"]),
   details: z.array(transactionDetailSchema).min(1, "Minimal satu rincian"),
   trx_date: z.date().optional(),
+  walletId: z.string().min(1).optional().nullable(),
 });
 
 export type TransactionCreateSchema = z.infer<typeof transactionCreateSchema>;
@@ -29,6 +30,7 @@ export type TransactionUpdateSchema = z.infer<typeof transactionUpdateSchema>;
 export const transactionFilterSchema = paginationSchema.extend({
   search: z.string().optional().nullable(),
   category: z.enum(["INCOME", "EXPENSE"]).optional().nullable(),
+  walletIds: z.array(z.string()).optional().nullable(),
   start_date: z.date().optional().nullable(),
   end_date: z.date().optional().nullable(),
   date_type: z.enum(["trx", "created"]).optional().nullable(),
@@ -40,6 +42,7 @@ export const transactionSummarySchema = z.object({
   start_date: z.date().optional().nullable(),
   end_date: z.date().optional().nullable(),
   category: z.enum(["INCOME", "EXPENSE"]).optional().nullable(),
+  walletIds: z.array(z.string()).optional().nullable(),
 });
 
 export type TransactionSummarySchema = z.infer<typeof transactionSummarySchema>;

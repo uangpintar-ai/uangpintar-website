@@ -45,6 +45,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Combobox } from "@/components/ui/combobox";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { toastError, toastSuccess } from "@/lib/toast";
 import {
@@ -77,6 +78,14 @@ const ManualTransactionForm = () => {
     control: form.control,
     name: "details",
   });
+
+  const { data: wallets } = api.wallet.findAll.useQuery();
+
+  useEffect(() => {
+    if (wallets?.length && !form.getValues("walletId")) {
+      form.setValue("walletId", wallets[0]!.id);
+    }
+  }, [wallets, form]);
 
   const category = form.watch("category");
   const details = form.watch("details");
@@ -134,6 +143,34 @@ const ManualTransactionForm = () => {
               })}
               className="space-y-4"
             >
+              <FormField
+                control={form.control}
+                name="walletId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dompet</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        options={
+                          wallets?.map((wallet) => ({
+                            value: wallet.id,
+                            label: `${wallet.name} - ${formatCurrency(wallet.balance)}`,
+                          })) ?? []
+                        }
+                        value={field.value ?? ""}
+                        onChange={(value) => {
+                          if (value) field.onChange(value);
+                        }}
+                        placeholder="Pilih dompet"
+                        searchPlaceholder="Cari dompet..."
+                        emptyText="Dompet tidak ditemukan"
+                        className="bg-white"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="category"

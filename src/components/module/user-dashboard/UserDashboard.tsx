@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Transaction, TransactionDetail } from "@prisma/client";
 import { Calendar } from "@/components/ui/calendar";
+import { CheckboxCombobox } from "@/components/ui/checkbox-combobox";
 import {
   cn,
   formatCurrency,
@@ -93,6 +94,13 @@ const MONTHS = [
 const CURRENT_YEAR = new Date().getFullYear();
 const CURRENT_MONTH = { year: CURRENT_YEAR, month: new Date().getMonth() };
 const YEARS = Array.from({ length: 11 }, (_, i) => CURRENT_YEAR - i);
+
+const NO_CACHE = {
+  staleTime: 0,
+  gcTime: 0,
+  refetchOnMount: "always",
+  refetchOnWindowFocus: true,
+} as const;
 
 const toDateInput = (date: Date) => {
   const y = date.getFullYear();
@@ -273,12 +281,18 @@ const UserDashboard = () => {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [category, setCategory] = useState<"INCOME" | "EXPENSE" | null>(null);
+  const [walletIds, setWalletIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [searchInput, setSearchInput] = useState("");
   const [selectedItem, setSelectedItem] = useState<
-    (Transaction & { details: TransactionDetail[] }) | null
+    | (Transaction & {
+        details: TransactionDetail[];
+        wallet: { name: string } | null;
+      })
+    | null
   >(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportCategory, setExportCategory] = useState<
     "ALL" | "INCOME" | "EXPENSE"
@@ -324,23 +338,54 @@ const UserDashboard = () => {
         ? new Date(yearSel, 11, 31, 23, 59, 59, 999)
         : range?.to
           ? endDate
-          : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+          : range?.from
+            ? new Date(range.from).setHours(23, 59, 59, 999)
+            : new Date(
+                now.getFullYear(),
+                now.getMonth() + 1,
+                0,
+                23,
+                59,
+                59,
+                999,
+              );
+
+  const { data: wallets } = api.wallet.findAll.useQuery(undefined, NO_CACHE);
+  const walletOptions =
+    wallets?.map((wallet) => ({
+      value: wallet.id,
+      label: wallet.name,
+    })) ?? [];
 
   const { data: summary, isLoading: isLoadingSummary } =
-    api.transaction.summary.useQuery({
-      start_date: startDate,
-      end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
-      category: category ?? undefined,
-    });
+    api.transaction.summary.useQuery(
+      {
+        start_date: startDate,
+        end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
+        category: category ?? undefined,
+        walletIds: walletIds.length ? walletIds : undefined,
+      },
+      NO_CACHE,
+    );
   const { data: list, isLoading: isLoadingList } =
-    api.transaction.findAll.useQuery({
-      page,
-      limit,
-      search,
-      category: category ?? undefined,
-      start_date: startDate,
-      end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
-    });
+    api.transaction.findAll.useQuery(
+      {
+        page,
+        limit,
+        search,
+        category: category ?? undefined,
+        walletIds: walletIds.length ? walletIds : undefined,
+        start_date: startDate,
+        end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
+      },
+      NO_CACHE,
+    );
+
+  useEffect(() => {
+    if (list && list.meta.total_page > 0 && page > list.meta.total_page) {
+      setPage(list.meta.total_page);
+    }
+  }, [list, page]);
 
   const rangeLabel =
     range?.from && range?.to
@@ -366,9 +411,11 @@ const UserDashboard = () => {
     setRange(undefined);
     setMonthSel(CURRENT_MONTH);
     setYearSel(undefined);
+    setWalletIds([]);
     setCalendarOpen(false);
     setSheetOpen(false);
     setFilterMode("month");
+    setPage(1);
   };
 
   const handleExport = async () => {
@@ -521,6 +568,18 @@ const UserDashboard = () => {
           <div className="hidden items-center gap-2 md:flex">
             {mounted && (
               <>
+                <CheckboxCombobox
+                  options={walletOptions}
+                  values={walletIds}
+                  onChange={(values) => {
+                    setWalletIds(values);
+                    setPage(1);
+                  }}
+                  placeholder="Semua Dompet"
+                  searchPlaceholder="Cari dompet..."
+                  emptyText="Dompet tidak ditemukan"
+                  className="h-8 w-[150px] border-dl-border bg-white text-xs font-medium text-dl-foreground"
+                />
                 <Select
                   value={category ?? "ALL"}
                   onValueChange={(v) => {
@@ -590,7 +649,7 @@ const UserDashboard = () => {
             )}
           </div>
 
-          <div className="w-full md:hidden">
+          <div className="w-full space-y-2 md:hidden">
             {mounted ? (
               <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                 <SheetTrigger asChild>
@@ -642,6 +701,20 @@ const UserDashboard = () => {
                 <CalendarDays className="h-4 w-4 text-dl-primary" />
                 {filterLabel}
               </Button>
+            )}
+            {mounted && (
+              <CheckboxCombobox
+                options={walletOptions}
+                values={walletIds}
+                onChange={(values) => {
+                  setWalletIds(values);
+                  setPage(1);
+                }}
+                placeholder="Semua Dompet"
+                searchPlaceholder="Cari dompet..."
+                emptyText="Dompet tidak ditemukan"
+                className="h-8 w-full border-dl-border bg-white text-xs font-medium text-dl-foreground"
+              />
             )}
           </div>
         </div>
@@ -737,6 +810,9 @@ const UserDashboard = () => {
                         Kategori
                       </TableHead>
                       <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                        Dompet
+                      </TableHead>
+                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
                         Nominal
                       </TableHead>
                       <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
@@ -754,7 +830,7 @@ const UserDashboard = () => {
                     {list?.items.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={8}
+                          colSpan={9}
                           className="py-10 text-center text-sm text-dl-muted"
                         >
                           Belum ada transaksi
@@ -775,7 +851,10 @@ const UserDashboard = () => {
                                 variant="outline"
                                 size="sm"
                                 className="text-dl-foreground"
-                                onClick={() => setSelectedItem(item)}
+                                onClick={() => {
+                                  setSelectedItem(item);
+                                  setDetailOpen(true);
+                                }}
                               >
                                 Lihat Rincian
                               </Button>
@@ -796,6 +875,9 @@ const UserDashboard = () => {
                                 ? "Pemasukan"
                                 : "Pengeluaran"}
                             </span>
+                          </TableCell>
+                          <TableCell className="px-4 py-3 text-dl-foreground">
+                            {item.wallet?.name ?? "-"}
                           </TableCell>
                           <TableCell
                             className={cn(
@@ -833,12 +915,18 @@ const UserDashboard = () => {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setSelectedItem(item)}
+                      onClick={() => {
+                        setSelectedItem(item);
+                        setDetailOpen(true);
+                      }}
                       className="flex w-full cursor-pointer items-center justify-between gap-3 px-6 py-3 text-left"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-dl-foreground">
                           {item.purpose}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-dl-muted">
+                          {item.wallet?.name ?? "-"}
                         </p>
                         <p
                           className={cn(
@@ -857,10 +945,7 @@ const UserDashboard = () => {
                 )}
               </div>
 
-              <Dialog
-                open={!!selectedItem}
-                onOpenChange={(open) => !open && setSelectedItem(null)}
-              >
+              <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
                 <DialogContent className="bg-white">
                   {selectedItem && (
                     <>
@@ -892,6 +977,12 @@ const UserDashboard = () => {
                             {selectedItem.category === "INCOME"
                               ? "Pemasukan"
                               : "Pengeluaran"}
+                          </dd>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <dt className="text-dl-muted">Dompet</dt>
+                          <dd className="text-dl-foreground">
+                            {selectedItem.wallet?.name ?? "-"}
                           </dd>
                         </div>
                         <div className="flex items-center justify-between gap-3">

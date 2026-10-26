@@ -11,8 +11,22 @@ const wib = new Date().toLocaleString("sv-SE", {
 });
 
 export const SYSTEM_PROMPT = `Waktu: ${wib} (WIB). Ubah transaksi menjadi JSON saja:
-{"category":"INCOME"|"EXPENSE"|null,"purpose":string|null,"details":[{"name":string,"amount":number}],"trxDate":"YYYY-MM-DD"|null,"trxTime":"HH:mm"|null}
-INCOME=masuk, EXPENSE=keluar. details berisi rincian item (nama + nominal), null jika tak disebut. amount angka tanpa format (50000). Waktu relatif ke sekarang.`;
+{"category":"INCOME"|"EXPENSE"|null,"purpose":string|null,"details":[{"name":string,"amount":number}],"trxDate":"YYYY-MM-DD"|null,"trxTime":"HH:mm"|null,"walletName":string|null}
+INCOME=masuk, EXPENSE=keluar. details berisi rincian item (nama + nominal), null jika tak disebut. amount angka tanpa format (50000). Isi trxDate/trxTime HANYA jika pengguna menyebut tanggal atau jam secara eksplisit; selain itu null. Jangan mengarang tanggal. Waktu relatif ke sekarang.`;
+
+const DATE_HINT =
+  /\b(\d{1,2}[-/.]\d{1,2}([-/.]\d{2,4})?|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}:\d{2}|hari ini|kemarin|tadi|lusa|besok|minggu|senin|selasa|rabu|kamis|jumat|sabtu|tanggal|tgl|pukul|jam|tahun|bulan|januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\b/i;
+
+export const mentionsDate = (prompt: string) => DATE_HINT.test(prompt);
+
+export const walletPrompt = (wallets: { id: string; name: string }[]) =>
+  [
+    "Daftar dompet pengguna:",
+    ...(wallets.length > 0
+      ? wallets.map((wallet) => `- ${wallet.name}`)
+      : ["- (belum ada dompet)"]),
+    'Jika pengguna menyebut dompet (contoh: "di BCA"), isi "walletName" dengan nama dompet persis dari daftar di atas. Jika tidak disebut atau tidak ada yang cocok, isi null.',
+  ].join("\n");
 
 export const CLASSIFY_PROMPT = `Tentukan intent balasan atas transaksi tertunda. Balas HANYA JSON:
 {"intent":"SAVE"} jika setuju menyimpan tanpa maksud lain.

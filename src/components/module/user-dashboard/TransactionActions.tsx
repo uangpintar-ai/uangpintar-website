@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import {
@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,7 @@ const TransactionActions = ({ item, variant = "icon" }: Props) => {
   const invalidate = () => {
     utils.transaction.findAll.invalidate();
     utils.transaction.summary.invalidate();
+    utils.wallet.findAll.invalidate();
   };
 
   const editTransaction = api.transaction.update.useMutation({
@@ -123,6 +125,7 @@ const TransactionActions = ({ item, variant = "icon" }: Props) => {
         ? item.details.map((d) => ({ name: d.name, amount: String(d.amount) }))
         : [{ name: "", amount: "" }],
       trx_date: item.trxDate,
+      walletId: item.walletId,
     },
   });
 
@@ -130,6 +133,14 @@ const TransactionActions = ({ item, variant = "icon" }: Props) => {
     control: form.control,
     name: "details",
   });
+
+  const { data: wallets } = api.wallet.findAll.useQuery();
+
+  useEffect(() => {
+    if (wallets?.length && !form.getValues("walletId")) {
+      form.setValue("walletId", wallets[0]!.id);
+    }
+  }, [wallets, form]);
 
   const category = form.watch("category");
   const details = form.watch("details");
@@ -202,6 +213,34 @@ const TransactionActions = ({ item, variant = "icon" }: Props) => {
               })}
               className="space-y-4"
             >
+              <FormField
+                control={form.control}
+                name="walletId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dompet</FormLabel>
+                    <FormControl>
+                      <Combobox
+                        options={
+                          wallets?.map((wallet) => ({
+                            value: wallet.id,
+                            label: `${wallet.name} - ${formatCurrency(wallet.balance)}`,
+                          })) ?? []
+                        }
+                        value={field.value ?? ""}
+                        onChange={(value) => {
+                          if (value) field.onChange(value);
+                        }}
+                        placeholder="Pilih dompet"
+                        searchPlaceholder="Cari dompet..."
+                        emptyText="Dompet tidak ditemukan"
+                        className="bg-white"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="category"

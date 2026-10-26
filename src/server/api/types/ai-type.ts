@@ -7,8 +7,10 @@ export type TAIResponse = {
   category: string;
   purpose: string;
   details: TAITransactionDetail[];
-  trxDate: string;
-  trxTime: string;
+  trxDate: string | null;
+  trxTime: string | null;
+  walletName?: string | null;
+  walletId?: string | null;
 };
 
 export type TAIReplyIntent = "SAVE" | "CONVERSATION";

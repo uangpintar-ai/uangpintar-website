@@ -64,7 +64,10 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between overflow-hidden", className)}
+          className={cn(
+            "w-full cursor-pointer justify-between overflow-hidden hover:bg-slate-50 hover:text-slate-900",
+            className,
+          )}
           disabled={disabled}
         >
           <p className="text-ellipsis line-clamp-1">
@@ -91,18 +94,19 @@ export function Combobox({
                   key={option.value}
                   value={option.label}
                   keywords={[option.value, option.label]}
+                  className="cursor-pointer data-[selected=true]:bg-slate-100 data-[selected=true]:text-slate-900"
                   onSelect={() => {
                     onChange(option.value === value ? undefined : option.value);
                     setOpen(false);
                   }}
                 >
+                  <span className="truncate">{option.label}</span>
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "ml-auto h-4 w-4 shrink-0 text-slate-700",
                       value === option.value ? "opacity-100" : "opacity-0",
                     )}
                   />
-                  {option.label}
                 </CommandItem>
               ))}
             </CommandGroup>

@@ -10,6 +10,7 @@ import {
 } from "@/lib/verification";
 import { checkoutLeadSchema } from "@/schema/payment-schema";
 import { applyPlan } from "@/server/services/payment-service";
+import { DEFAULT_WALLET_NAME } from "@/server/services/wallet-service";
 
 type CheckoutBody = {
   plan?: string;
@@ -180,6 +181,7 @@ export const POST = async (request: Request) => {
             maxAISession: 20,
             packageStart: new Date(),
             packageRnd: new Date(),
+            wallets: { create: { name: DEFAULT_WALLET_NAME } },
           },
           select: {
             id: true,

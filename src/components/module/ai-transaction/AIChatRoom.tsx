@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
+import { Combobox } from "@/components/ui/combobox";
 import InputMoney from "@/components/shared/InputMoney";
 import {
   Popover,
@@ -415,6 +416,9 @@ type TransactionCardProps = {
   saving: boolean;
   onSave: () => void;
   onEdit: () => void;
+  walletOptions: { value: string; label: string }[];
+  walletId: string;
+  onWalletChange: (value: string) => void;
 };
 
 const TransactionCard = ({
@@ -423,6 +427,9 @@ const TransactionCard = ({
   saving,
   onSave,
   onEdit,
+  walletOptions,
+  walletId,
+  onWalletChange,
 }: TransactionCardProps) => {
   const category = normalizeCategory(draft.category);
   const isIncome = category === "INCOME";
@@ -546,6 +553,20 @@ const TransactionCard = ({
 
       {showActions && (
         <>
+          <div className="mt-2">
+            <p className="mb-1 text-[10px] text-dl-muted">Dompet</p>
+            <Combobox
+              options={walletOptions}
+              value={walletId}
+              onChange={(value) => {
+                if (value) onWalletChange(value);
+              }}
+              placeholder="Pilih dompet"
+              searchPlaceholder="Cari dompet..."
+              emptyText="Dompet tidak ditemukan"
+              className="h-8 bg-white text-xs"
+            />
+          </div>
           <p className="mt-2 text-xs text-dl-foreground">
             Apakah kamu mau catat transaksinya?
           </p>
@@ -586,7 +607,9 @@ const TransactionCard = ({
 const AIChatRoom = () => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { data: wallets } = api.wallet.findAll.useQuery();
   const isFreeTier = session?.user?.status === "GRATIS";
+  const [walletId, setWalletId] = useState("");
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -635,6 +658,7 @@ const AIChatRoom = () => {
         });
       }
       aiResponseRef.current = draft;
+      if (draft.walletId) setWalletId(draft.walletId);
       idRef.current = lastId;
       setMessages(loaded);
       setSessionCost(session.details.reduce((sum, d) => sum + d.cost, 0));
@@ -658,9 +682,16 @@ const AIChatRoom = () => {
     getOrCreateSession.mutate();
   }, []);
 
+  useEffect(() => {
+    if (wallets?.length && !walletId) {
+      setWalletId(wallets[0]!.id);
+    }
+  }, [wallets, walletId]);
+
   const sendMessage = api.ai.sendMessage.useMutation({
     onSuccess: (result) => {
       mergeResponse(aiResponseRef.current, result.data);
+      if (result.data.walletId) setWalletId(result.data.walletId);
       setSessionCost((c) => c + (result.usage?.cost ?? 0));
       pushMessage({
         role: "ai",
@@ -877,6 +908,7 @@ const AIChatRoom = () => {
       purpose,
       details,
       trx_date: draftDate(aiResponseRef.current) ?? new Date(),
+      walletId: walletId || undefined,
     });
   };
 
@@ -1061,6 +1093,14 @@ const AIChatRoom = () => {
                   saving={createTransaction.isPending}
                   onSave={saveDraft}
                   onEdit={() => setEditOpen(true)}
+                  walletOptions={
+                    wallets?.map((wallet) => ({
+                      value: wallet.id,
+                      label: wallet.name,
+                    })) ?? []
+                  }
+                  walletId={walletId}
+                  onWalletChange={setWalletId}
                 />
               </div>
             );

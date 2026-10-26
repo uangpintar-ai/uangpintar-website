@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/server/db";
 import { fail, ok, str } from "@/lib/mobile-auth";
 import { sendRegisterCode } from "@/server/services/verification-service";
+import { DEFAULT_WALLET_NAME } from "@/server/services/wallet-service";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       maxAISession: 20,
       packageStart: new Date(),
       packageRnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      wallets: { create: { name: DEFAULT_WALLET_NAME } },
     },
   });
 

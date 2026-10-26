@@ -7,28 +7,12 @@ import {
   transactionUpdateSchema,
 } from "@/schema/transaction-schema";
 import { z } from "zod";
-import { randomInt } from "crypto";
 import { TRPCError } from "@trpc/server";
-
-const ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-const toInt = (value: string) => Number(value.replace(/[^\d]/g, "")) || 0;
-const toFloat = (value: string | number) =>
-  typeof value === "number" ? value : Number(value.replace(/[^\d.]/g, "")) || 0;
-
-const generateTrxId = () => {
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += ALPHANUMERIC[randomInt(ALPHANUMERIC.length)];
-  }
-  return `TRX-${code}`;
-};
-
-const mapDetails = (details: { name: string; amount: string | number }[]) =>
-  details.map((d) => ({ name: d.name, amount: toFloat(d.amount) }));
-
-const sumDetails = (details: { amount: number }[]) =>
-  details.reduce((sum, d) => sum + d.amount, 0);
+import {
+  createTransaction,
+  deleteTransaction,
+  updateTransaction,
+} from "@/server/services/transaction-service";
 
 export const transactionRouter = createTRPCRouter({
   findAll: protectedProcedure
@@ -72,11 +56,17 @@ export const transactionRouter = createTRPCRouter({
             }
           : {}),
         ...(input.category ? { category: input.category } : {}),
+        ...(input.walletIds?.length
+          ? { walletId: { in: input.walletIds } }
+          : {}),
       };
       const [items, total] = await Promise.all([
         ctx.db.transaction.findMany({
           where,
-          include: { details: { orderBy: { createdAt: "asc" } } },
+          include: {
+            details: { orderBy: { createdAt: "asc" } },
+            wallet: { select: { name: true } },
+          },
           skip: (input.page - 1) * input.limit,
           take: input.limit,
           orderBy: { createdAt: "desc" },
@@ -182,8 +172,11 @@ export const transactionRouter = createTRPCRouter({
           ...(input.end_date ? { lte: input.end_date } : {}),
         },
         ...(input.category ? { category: input.category } : {}),
+        ...(input.walletIds?.length
+          ? { walletId: { in: input.walletIds } }
+          : {}),
       };
-      const [transactions, user] = await Promise.all([
+      const [transactions, user, wallets] = await Promise.all([
         ctx.db.transaction.findMany({
           where,
           select: { totalAmount: true, category: true },
@@ -192,11 +185,22 @@ export const transactionRouter = createTRPCRouter({
           where: { id: ctx.session.userId },
           select: { balance: true },
         }),
+        input.walletIds?.length
+          ? ctx.db.wallet.aggregate({
+              where: {
+                userId: ctx.session.userId,
+                id: { in: input.walletIds },
+              },
+              _sum: { balance: true },
+            })
+          : null,
       ]);
       const income = transactions.filter((t) => t.category === "INCOME");
       const expense = transactions.filter((t) => t.category === "EXPENSE");
       return {
-        balance: user?.balance ?? 0,
+        balance: input.walletIds?.length
+          ? (wallets?._sum.balance ?? 0)
+          : (user?.balance ?? 0),
         income: {
           nominal: income.reduce((sum, t) => sum + t.totalAmount, 0),
           quantity: income.length,
@@ -238,83 +242,24 @@ export const transactionRouter = createTRPCRouter({
   create: protectedProcedure
     .input(transactionCreateSchema)
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.session.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
-      const details = mapDetails(input.details);
-      const totalAmount = sumDetails(details);
-      const balanceDelta =
-        input.category === "INCOME" ? totalAmount : -totalAmount;
-      await ctx.db.$transaction([
-        ctx.db.transaction.create({
-          data: {
-            userId: ctx.session.userId,
-            trxId: generateTrxId(),
-            trxDate: input.trx_date ?? new Date(),
-            category: input.category,
-            purpose: input.purpose,
-            totalAmount,
-            details: { create: details },
-          },
-        }),
-        ctx.db.user.update({
-          where: { id: ctx.session.userId },
-          data: { balance: { increment: balanceDelta } },
-        }),
-      ]);
+      await createTransaction(ctx.session.userId!, input);
     }),
 
   update: protectedProcedure
     .input(transactionUpdateSchema)
     .mutation(async ({ input, ctx }) => {
-      const existing = await ctx.db.transaction.findFirst({
-        where: { id: input.id, userId: ctx.session.userId },
-      });
-      if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
-      const oldDelta =
-        existing.category === "INCOME"
-          ? existing.totalAmount
-          : -existing.totalAmount;
-      const details = mapDetails(input.details);
-      const newAmount = sumDetails(details);
-      const newDelta = input.category === "INCOME" ? newAmount : -newAmount;
-      await ctx.db.$transaction([
-        ctx.db.transaction.update({
-          where: { id: input.id },
-          data: {
-            trxDate: input.trx_date ?? undefined,
-            category: input.category,
-            purpose: input.purpose,
-            totalAmount: newAmount,
-            details: { deleteMany: {}, create: details },
-          },
-        }),
-        ctx.db.user.update({
-          where: { id: ctx.session.userId },
-          data: { balance: { increment: newDelta - oldDelta } },
-        }),
-      ]);
+      const updated = await updateTransaction(
+        ctx.session.userId!,
+        input.id,
+        input,
+      );
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const existing = await ctx.db.transaction.findFirst({
-        where: { id: input.id, userId: ctx.session.userId },
-      });
-      if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
-      const balanceDelta =
-        existing.category === "INCOME"
-          ? -existing.totalAmount
-          : existing.totalAmount;
-      await ctx.db.$transaction([
-        ctx.db.transaction.deleteMany({
-          where: { id: input.id, userId: ctx.session.userId },
-        }),
-        ctx.db.user.update({
-          where: { id: ctx.session.userId },
-          data: { balance: { increment: balanceDelta } },
-        }),
-      ]);
+      const deleted = await deleteTransaction(ctx.session.userId!, input.id);
+      if (!deleted) throw new TRPCError({ code: "NOT_FOUND" });
     }),
 });

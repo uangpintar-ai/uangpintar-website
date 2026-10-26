@@ -1,20 +1,22 @@
 model Transaction {
-    id          String              @id @default(uuid())
-    trxId       String              @unique
-    userId      String
-    trxDate     DateTime            @default(now())
-    category    TransactionCategory
-    purpose     String
-    totalAmount Float               @default(0)
-    createdAt   DateTime            @default(now()) @map("created_at")
-    updatedAt   DateTime            @updatedAt @map("updated_at")
-    user        User                @relation(fields: [userId], references: [id])
-    details     TransactionDetail[]
+  id          String              @id @default(uuid())
+  trxId       String              @unique
+  userId      String
+  walletId    String?
+  trxDate     DateTime            @default(now())
+  category    TransactionCategory
+  purpose     String
+  totalAmount Float               @default(0)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  user        User                @relation(fields: [userId], references: [id])
+  wallet      Wallet?             @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  details     TransactionDetail[]
 
-    @@map("transactions")
+  @@map("transactions")
 }
 
 enum TransactionCategory {
-    INCOME
-    EXPENSE
+  INCOME
+  EXPENSE
 }

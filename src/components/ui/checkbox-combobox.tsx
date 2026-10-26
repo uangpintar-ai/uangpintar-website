@@ -75,7 +75,10 @@ export function CheckboxCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between overflow-hidden", className)}
+          className={cn(
+            "w-full cursor-pointer justify-between overflow-hidden hover:bg-slate-50 hover:text-slate-900",
+            className,
+          )}
           disabled={disabled}
         >
           <p className="text-ellipsis line-clamp-1">
@@ -83,7 +86,7 @@ export function CheckboxCombobox({
               ? placeholder
               : selected.length === 1
                 ? selected[0]!.label
-                : `${selected.length} terpilih`}
+                : `${selected.length} dompet`}
           </p>
           <ChevronDown
             className={cn(
@@ -104,11 +107,15 @@ export function CheckboxCombobox({
                   key={option.value}
                   value={option.label}
                   keywords={[option.value, option.label]}
+                  className="cursor-pointer data-[selected=true]:bg-slate-100 data-[selected=true]:text-slate-900"
                   onSelect={() => {
                     toggle(option.value);
                   }}
                 >
-                  <Checkbox checked={values.includes(option.value)} />
+                  <Checkbox
+                    checked={values.includes(option.value)}
+                    className="data-[state=checked]:border-slate-700 data-[state=checked]:bg-slate-700 data-[state=checked]:text-white dark:data-[state=checked]:border-slate-600 dark:data-[state=checked]:bg-slate-600 dark:data-[state=checked]:text-white"
+                  />
                   <span className="ml-2">{option.label}</span>
                 </CommandItem>
               ))}

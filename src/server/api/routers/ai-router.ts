@@ -9,8 +9,10 @@ import {
   chatCompletion,
   draftSummary,
   getOrCreateOpenSession,
+  mentionsDate,
   parseAIReplyIntent,
   parseAIResponse,
+  walletPrompt,
 } from "@/server/services/ai-service";
 
 const draftDetailSchema = z.object({
@@ -91,9 +93,16 @@ export const aiRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const session = await getOrCreateOpenSession(ctx.db, ctx.session.userId);
 
+      const wallets = await ctx.db.wallet.findMany({
+        where: { userId: ctx.session.userId! },
+        select: { id: true, name: true },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const baseSystem = `${SYSTEM_PROMPT}\n\n${walletPrompt(wallets)}`;
       const systemContent = input.draft
-        ? `${SYSTEM_PROMPT}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(input.draft)}`
-        : SYSTEM_PROMPT;
+        ? `${baseSystem}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(input.draft)}`
+        : baseSystem;
 
       const { content, usage } = await chatCompletion(
         [
@@ -104,6 +113,15 @@ export const aiRouter = createTRPCRouter({
       );
 
       const parsed = parseAIResponse(content);
+      if (!mentionsDate(input.prompt)) {
+        parsed.trxDate = null;
+        parsed.trxTime = null;
+      }
+      const walletName = parsed.walletName?.trim().toLowerCase();
+      parsed.walletId =
+        wallets.find(
+          (wallet) => wallet.name.trim().toLowerCase() === walletName,
+        )?.id ?? null;
 
       await ctx.db.aIChatSessionDetail.create({
         data: {
