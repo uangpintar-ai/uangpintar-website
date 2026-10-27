@@ -6,6 +6,7 @@ import {
   CLASSIFY_MODEL,
   CLASSIFY_PROMPT,
   SYSTEM_PROMPT,
+  categoryPrompt,
   chatCompletion,
   draftSummary,
   getOrCreateOpenSession,
@@ -18,9 +19,11 @@ import {
 const draftDetailSchema = z.object({
   name: z.string().nullable().optional(),
   amount: z.union([z.string(), z.number()]).nullable().optional(),
+  category: z.string().nullable().optional(),
 });
 
 const draftSchema = z.object({
+  type: z.string().nullable().optional(),
   category: z.string().nullable().optional(),
   purpose: z.string().nullable().optional(),
   details: z.array(draftDetailSchema).nullable().optional(),
@@ -93,13 +96,20 @@ export const aiRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const session = await getOrCreateOpenSession(ctx.db, ctx.session.userId);
 
-      const wallets = await ctx.db.wallet.findMany({
-        where: { userId: ctx.session.userId! },
-        select: { id: true, name: true },
-        orderBy: { createdAt: "asc" },
-      });
+      const [wallets, categories] = await Promise.all([
+        ctx.db.wallet.findMany({
+          where: { userId: ctx.session.userId! },
+          select: { id: true, name: true },
+          orderBy: { createdAt: "asc" },
+        }),
+        ctx.db.transactionCategory.findMany({
+          where: { userId: ctx.session.userId! },
+          select: { name: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        }),
+      ]);
 
-      const baseSystem = `${SYSTEM_PROMPT}\n\n${walletPrompt(wallets)}`;
+      const baseSystem = `${SYSTEM_PROMPT}\n\n${walletPrompt(wallets)}\n\n${categoryPrompt(categories)}`;
       const systemContent = input.draft
         ? `${baseSystem}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(input.draft)}`
         : baseSystem;
@@ -110,9 +120,11 @@ export const aiRouter = createTRPCRouter({
           { role: "user", content: input.prompt },
         ],
         "xiaomi/mimo-v2.6-flash",
+        400,
       );
 
       const parsed = parseAIResponse(content);
+      if (parsed.type == null) parsed.type = parsed.category ?? null;
       if (!mentionsDate(input.prompt)) {
         parsed.trxDate = null;
         parsed.trxTime = null;

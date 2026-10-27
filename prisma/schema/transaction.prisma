@@ -4,7 +4,7 @@ model Transaction {
   userId      String
   walletId    String?
   trxDate     DateTime            @default(now())
-  category    TransactionCategory
+  type        TransactionType     @map("category")
   purpose     String
   totalAmount Float               @default(0)
   createdAt   DateTime            @default(now()) @map("created_at")
@@ -16,7 +16,9 @@ model Transaction {
   @@map("transactions")
 }
 
-enum TransactionCategory {
+enum TransactionType {
   INCOME
   EXPENSE
+
+  @@map("TransactionCategory")
 }

@@ -16,11 +16,9 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const start_date = toDate(sp.get("start_date"));
   const end_date = toDate(sp.get("end_date"));
-  const categoryRaw = sp.get("category");
-  const category =
-    categoryRaw === "INCOME" || categoryRaw === "EXPENSE"
-      ? categoryRaw
-      : undefined;
+  const typeRaw = sp.get("type");
+  const type =
+    typeRaw === "INCOME" || typeRaw === "EXPENSE" ? typeRaw : undefined;
 
   const where: Prisma.TransactionWhereInput = {
     userId: claims.userId,
@@ -28,13 +26,13 @@ export async function GET(req: NextRequest) {
       ...(start_date ? { gte: start_date } : {}),
       ...(end_date ? { lte: end_date } : {}),
     },
-    ...(category ? { category } : {}),
+    ...(type ? { type } : {}),
   };
 
   const [transactions, user] = await Promise.all([
     db.transaction.findMany({
       where,
-      select: { totalAmount: true, category: true },
+      select: { totalAmount: true, type: true },
     }),
     db.user.findUnique({
       where: { id: claims.userId },
@@ -42,8 +40,8 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const income = transactions.filter((t) => t.category === "INCOME");
-  const expense = transactions.filter((t) => t.category === "EXPENSE");
+  const income = transactions.filter((t) => t.type === "INCOME");
+  const expense = transactions.filter((t) => t.type === "EXPENSE");
 
   return ok({
     balance: user?.balance ?? 0,

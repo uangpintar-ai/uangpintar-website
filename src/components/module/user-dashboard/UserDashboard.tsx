@@ -39,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Transaction, TransactionDetail } from "@prisma/client";
 import { Calendar } from "@/components/ui/calendar";
 import { CheckboxCombobox } from "@/components/ui/checkbox-combobox";
@@ -59,12 +60,14 @@ import {
   Loader2,
   History,
   FileSpreadsheet,
+  Tags,
 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { useDebounced } from "@/lib/debounced";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { PiCalculator, PiTag } from "react-icons/pi";
+import { PiCalculator } from "react-icons/pi";
+import { TransactionCategoryIcon } from "@/const/general/transaction-category-icons";
 import { toastError, toastSuccess } from "@/lib/toast";
 import TransactionActions from "./TransactionActions";
 
@@ -280,23 +283,28 @@ const UserDashboard = () => {
   const [yearSel, setYearSel] = useState<number | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [category, setCategory] = useState<"INCOME" | "EXPENSE" | null>(null);
+  const [tab, setTab] = useState<"transaksi" | "kategori">("transaksi");
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [type, setType] = useState<"INCOME" | "EXPENSE" | null>(null);
   const [walletIds, setWalletIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [categoryPage, setCategoryPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [searchInput, setSearchInput] = useState("");
   const [selectedItem, setSelectedItem] = useState<
     | (Transaction & {
-        details: TransactionDetail[];
+        details: (TransactionDetail & {
+          category: { name: string; icon: string } | null;
+        })[];
         wallet: { name: string } | null;
       })
     | null
   >(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportCategory, setExportCategory] = useState<
-    "ALL" | "INCOME" | "EXPENSE"
-  >("ALL");
+  const [exportType, setexportType] = useState<"ALL" | "INCOME" | "EXPENSE">(
+    "ALL",
+  );
   const [exportDateType, setExportDateType] = useState<"trx" | "created">(
     "trx",
   );
@@ -350,6 +358,18 @@ const UserDashboard = () => {
                 999,
               );
 
+  const categoryFilterKey = [
+    categoryId ?? "",
+    type ?? "",
+    walletIds.join(","),
+    startDate.getTime(),
+    effectiveEndDate ? new Date(effectiveEndDate).getTime() : 0,
+  ].join("|");
+
+  useEffect(() => {
+    setCategoryPage(1);
+  }, [categoryFilterKey]);
+
   const { data: wallets } = api.wallet.findAll.useQuery(undefined, NO_CACHE);
   const walletOptions =
     wallets?.map((wallet) => ({
@@ -362,7 +382,7 @@ const UserDashboard = () => {
       {
         start_date: startDate,
         end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
-        category: category ?? undefined,
+        type: type ?? undefined,
         walletIds: walletIds.length ? walletIds : undefined,
       },
       NO_CACHE,
@@ -373,8 +393,23 @@ const UserDashboard = () => {
         page,
         limit,
         search,
-        category: category ?? undefined,
+        type: type ?? undefined,
         walletIds: walletIds.length ? walletIds : undefined,
+        start_date: startDate,
+        end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
+      },
+      NO_CACHE,
+    );
+
+  const { data: categories } = api.category.findAll.useQuery();
+  const { data: detailList, isLoading: isLoadingDetails } =
+    api.transaction.findDetails.useQuery(
+      {
+        page: categoryPage,
+        limit,
+        type: type ?? undefined,
+        walletIds: walletIds.length ? walletIds : undefined,
+        categoryId: categoryId ?? undefined,
         start_date: startDate,
         end_date: effectiveEndDate ? new Date(effectiveEndDate) : undefined,
       },
@@ -386,6 +421,16 @@ const UserDashboard = () => {
       setPage(list.meta.total_page);
     }
   }, [list, page]);
+
+  useEffect(() => {
+    if (
+      detailList &&
+      detailList.meta.total_page > 0 &&
+      categoryPage > detailList.meta.total_page
+    ) {
+      setCategoryPage(detailList.meta.total_page);
+    }
+  }, [detailList, categoryPage]);
 
   const rangeLabel =
     range?.from && range?.to
@@ -429,7 +474,7 @@ const UserDashboard = () => {
       const result = await utils.transaction.findAll.fetch({
         page: 1,
         limit: 100000,
-        category: exportCategory === "ALL" ? undefined : exportCategory,
+        type: exportType === "ALL" ? undefined : exportType,
         start_date: start,
         end_date: end,
         date_type: exportDateType,
@@ -456,7 +501,8 @@ const UserDashboard = () => {
           rows.push({
             "ID Transaksi": trx.trxId,
             Keterangan: trx.purpose,
-            Kategori: trx.category === "INCOME" ? "Pemasukan" : "Pengeluaran",
+            "Tipe Transaksi":
+              trx.type === "INCOME" ? "Pemasukan" : "Pengeluaran",
             Rincian: detail ? detail.name : "-",
             Nominal: detail ? detail.amount : trx.totalAmount,
             "Tanggal Transaksi": formatDateWithTime(trx.trxDate.toISOString()),
@@ -519,7 +565,7 @@ const UserDashboard = () => {
             <Loader2 className="h-5 w-5 animate-spin text-dl-muted" />
           ) : (
             <>
-              {category !== "EXPENSE" && (
+              {type !== "EXPENSE" && (
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-medium text-dl-muted">
                     <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
@@ -533,7 +579,7 @@ const UserDashboard = () => {
                   </p>
                 </div>
               )}
-              {category !== "INCOME" && (
+              {type !== "INCOME" && (
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-medium text-dl-muted">
                     <TrendingDown className="h-3.5 w-3.5 text-rose-600" />
@@ -581,20 +627,18 @@ const UserDashboard = () => {
                   className="h-8 w-[150px] border-dl-border bg-white text-xs font-medium text-dl-foreground"
                 />
                 <Select
-                  value={category ?? "ALL"}
+                  value={type ?? "ALL"}
                   onValueChange={(v) => {
-                    setCategory(
-                      v === "ALL" ? null : (v as "INCOME" | "EXPENSE"),
-                    );
+                    setType(v === "ALL" ? null : (v as "INCOME" | "EXPENSE"));
                     setPage(1);
                   }}
                 >
                   <SelectTrigger className="h-8 w-[150px] cursor-pointer border-dl-border bg-white text-xs font-medium text-dl-foreground">
-                    <SelectValue placeholder="Semua Kategori" />
+                    <SelectValue placeholder="Semua Tipe" />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
                     <SelectItem value="ALL" className="cursor-pointer">
-                      Semua Kategori
+                      Semua Tipe
                     </SelectItem>
                     <SelectItem value="INCOME" className="cursor-pointer">
                       Pemasukan
@@ -731,12 +775,12 @@ const UserDashboard = () => {
               key={opt.label}
               type="button"
               onClick={() => {
-                setCategory(opt.value);
+                setType(opt.value);
                 setPage(1);
               }}
               className={cn(
                 "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                category === opt.value
+                type === opt.value
                   ? opt.value === "INCOME"
                     ? "border-emerald-500 bg-emerald-50 text-emerald-700"
                     : opt.value === "EXPENSE"
@@ -751,390 +795,586 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      <div className="hidden space-y-4 md:block sm:space-y-6">
-        {summaryCards}
-      </div>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-xl border border-dl-border bg-white p-1 sm:w-auto">
+          <TabsTrigger
+            value="transaksi"
+            className="flex-1 gap-2 border-0 px-4 py-2 text-xs font-semibold text-dl-muted data-[state=active]:bg-gradient-to-r data-[state=active]:from-dl-gradient-2 data-[state=active]:to-dl-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-dl-primary/20 sm:flex-none"
+          >
+            <History className="h-4 w-4" />
+            Transaksi
+          </TabsTrigger>
+          <TabsTrigger
+            value="kategori"
+            className="flex-1 gap-2 border-0 px-4 py-2 text-xs font-semibold text-dl-muted data-[state=active]:bg-gradient-to-r data-[state=active]:from-dl-gradient-2 data-[state=active]:to-dl-primary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-dl-primary/20 sm:flex-none"
+          >
+            <Tags className="h-4 w-4" />
+            Kategori
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="space-y-4 md:hidden">{summaryCards}</div>
+        <TabsContent value="transaksi" className="mt-4 space-y-4 sm:space-y-6">
+          <div className="hidden space-y-4 md:block sm:space-y-6">
+            {summaryCards}
+          </div>
 
-      <Card className="gap-0">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold text-dl-foreground">
-              <History className="h-4 w-4 text-dl-primary" />
-              Riwayat Transaksi
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setExportOpen(true)}
-              className="gap-2 border-dl-border text-xs font-medium text-dl-foreground"
-            >
-              <FileSpreadsheet className="h-4 w-4 text-dl-primary" />
-              Export Excel
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 md:p-0">
-          <div className="border-b border-dl-border px-4 pt-2 pb-4 sm:px-6">
-            <div className="relative w-full sm:w-[250px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dl-muted" />
-              <Input
-                placeholder="Cari Transaksi"
-                className="h-9 w-full bg-white pl-9"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-            </div>
-          </div>
-          {isLoadingList ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-dl-muted" />
-            </div>
-          ) : (
-            <>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-dl-background">
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        ID Transaksi
-                      </TableHead>
-                      <TableHead className="min-w-[300px] max-w-[300px] px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Keterangan
-                      </TableHead>
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Rincian
-                      </TableHead>
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Kategori
-                      </TableHead>
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Dompet
-                      </TableHead>
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Nominal
-                      </TableHead>
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Tanggal Transaksi
-                      </TableHead>
-                      <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Dibuat
-                      </TableHead>
-                      <TableHead className="sticky right-0 bg-dl-background px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
-                        Aksi
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+          <div className="space-y-4 md:hidden">{summaryCards}</div>
+
+          <Card className="gap-0">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-dl-foreground">
+                  <History className="h-4 w-4 text-dl-primary" />
+                  Riwayat Transaksi
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setExportOpen(true)}
+                  className="gap-2 border-dl-border text-xs font-medium text-dl-foreground"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-dl-primary" />
+                  Export Excel
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 md:p-0">
+              <div className="border-b border-dl-border px-4 pt-2 pb-4 sm:px-6">
+                <div className="relative w-full sm:w-[250px]">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dl-muted" />
+                  <Input
+                    placeholder="Cari Transaksi"
+                    className="h-9 w-full bg-white pl-9"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                  />
+                </div>
+              </div>
+              {isLoadingList ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-dl-muted" />
+                </div>
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-dl-background">
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            ID Transaksi
+                          </TableHead>
+                          <TableHead className="min-w-[300px] max-w-[300px] px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Keterangan
+                          </TableHead>
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Rincian
+                          </TableHead>
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Tipe Transaksi
+                          </TableHead>
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Dompet
+                          </TableHead>
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Nominal
+                          </TableHead>
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Tanggal Transaksi
+                          </TableHead>
+                          <TableHead className="px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Dibuat
+                          </TableHead>
+                          <TableHead className="sticky right-0 bg-dl-background px-4 text-xs font-semibold tracking-wide text-dl-muted uppercase">
+                            Aksi
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {list?.items.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={9}
+                              className="py-10 text-center text-sm text-dl-muted"
+                            >
+                              Belum ada transaksi
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          list?.items.map((item) => (
+                            <TableRow key={item.id} className="group">
+                              <TableCell className="px-4 py-3 font-medium text-dl-foreground">
+                                {item.trxId}
+                              </TableCell>
+                              <TableCell className="min-w-[300px] max-w-[300px] px-4 py-3 font-medium break-words whitespace-normal text-dl-foreground">
+                                {item.purpose}
+                              </TableCell>
+                              <TableCell className="px-4 py-3 align-top">
+                                {item.details.length > 0 ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-dl-foreground"
+                                    onClick={() => {
+                                      setSelectedItem(item);
+                                      setDetailOpen(true);
+                                    }}
+                                  >
+                                    Lihat Rincian
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-dl-muted">
+                                    -
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="px-4 py-3">
+                                <span
+                                  className={cn(
+                                    "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                                    item.type === "INCOME"
+                                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                      : "border-rose-200 bg-rose-50 text-rose-700",
+                                  )}
+                                >
+                                  {item.type === "INCOME"
+                                    ? "Pemasukan"
+                                    : "Pengeluaran"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="px-4 py-3 text-dl-foreground">
+                                {item.wallet?.name ?? "-"}
+                              </TableCell>
+                              <TableCell
+                                className={cn(
+                                  "px-4 py-3 font-semibold tabular-nums",
+                                  item.type === "INCOME"
+                                    ? "text-emerald-700"
+                                    : "text-rose-700",
+                                )}
+                              >
+                                {formatCurrency(item.totalAmount)}
+                              </TableCell>
+                              <TableCell className="px-4 py-3 text-dl-foreground">
+                                {formatDateWithTime(item.trxDate.toISOString())}
+                              </TableCell>
+                              <TableCell className="px-4 py-3 text-dl-foreground">
+                                {formatDateWithTime(
+                                  item.createdAt.toISOString(),
+                                )}
+                              </TableCell>
+                              <TableCell className="sticky right-0 bg-white px-4 py-3">
+                                <TransactionActions item={item} />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="divide-y divide-dl-border md:hidden">
                     {list?.items.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={9}
-                          className="py-10 text-center text-sm text-dl-muted"
-                        >
-                          Belum ada transaksi
-                        </TableCell>
-                      </TableRow>
+                      <p className="py-10 text-center text-sm text-dl-muted">
+                        Belum ada transaksi
+                      </p>
                     ) : (
                       list?.items.map((item) => (
-                        <TableRow key={item.id} className="group">
-                          <TableCell className="px-4 py-3 font-medium text-dl-foreground">
-                            {item.trxId}
-                          </TableCell>
-                          <TableCell className="min-w-[300px] max-w-[300px] px-4 py-3 font-medium break-words whitespace-normal text-dl-foreground">
-                            {item.purpose}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 align-top">
-                            {item.details.length > 0 ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-dl-foreground"
-                                onClick={() => {
-                                  setSelectedItem(item);
-                                  setDetailOpen(true);
-                                }}
-                              >
-                                Lihat Rincian
-                              </Button>
-                            ) : (
-                              <span className="text-xs text-dl-muted">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="px-4 py-3">
-                            <span
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setDetailOpen(true);
+                          }}
+                          className="flex w-full cursor-pointer items-center justify-between gap-3 px-6 py-3 text-left"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-dl-foreground">
+                              {item.purpose}
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-dl-muted">
+                              {item.wallet?.name ?? "-"}
+                            </p>
+                            <p
                               className={cn(
-                                "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                                item.category === "INCOME"
-                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                  : "border-rose-200 bg-rose-50 text-rose-700",
+                                "mt-0.5 text-xs tabular-nums",
+                                item.type === "INCOME"
+                                  ? "text-emerald-700"
+                                  : "text-rose-700",
                               )}
                             >
-                              {item.category === "INCOME"
-                                ? "Pemasukan"
-                                : "Pengeluaran"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-dl-foreground">
-                            {item.wallet?.name ?? "-"}
-                          </TableCell>
-                          <TableCell
-                            className={cn(
-                              "px-4 py-3 font-semibold tabular-nums",
-                              item.category === "INCOME"
-                                ? "text-emerald-700"
-                                : "text-rose-700",
-                            )}
-                          >
-                            {formatCurrency(item.totalAmount)}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-dl-foreground">
-                            {formatDateWithTime(item.trxDate.toISOString())}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-dl-foreground">
-                            {formatDateWithTime(item.createdAt.toISOString())}
-                          </TableCell>
-                          <TableCell className="sticky right-0 bg-white px-4 py-3">
-                            <TransactionActions item={item} />
-                          </TableCell>
-                        </TableRow>
+                              {formatCurrency(item.totalAmount)}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-dl-muted" />
+                        </button>
                       ))
                     )}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
 
-              <div className="divide-y divide-dl-border md:hidden">
-                {list?.items.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-dl-muted">
-                    Belum ada transaksi
-                  </p>
-                ) : (
-                  list?.items.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedItem(item);
-                        setDetailOpen(true);
-                      }}
-                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-6 py-3 text-left"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-dl-foreground">
-                          {item.purpose}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-dl-muted">
-                          {item.wallet?.name ?? "-"}
-                        </p>
-                        <p
-                          className={cn(
-                            "mt-0.5 text-xs tabular-nums",
-                            item.category === "INCOME"
-                              ? "text-emerald-700"
-                              : "text-rose-700",
-                          )}
-                        >
-                          {formatCurrency(item.totalAmount)}
-                        </p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-dl-muted" />
-                    </button>
-                  ))
-                )}
-              </div>
+                  <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                    <DialogContent className="bg-white">
+                      {selectedItem && (
+                        <>
+                          <DialogHeader className="text-left">
+                            <DialogTitle className="pr-6 text-base text-dl-foreground">
+                              {selectedItem.purpose}
+                            </DialogTitle>
+                            <DialogDescription className="sr-only">
+                              Detail transaksi
+                            </DialogDescription>
+                          </DialogHeader>
+                          <dl className="space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-dl-muted">ID Transaksi</dt>
+                              <dd className="text-dl-foreground">
+                                {selectedItem.trxId}
+                              </dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-dl-muted">Tipe Transaksi</dt>
+                              <dd
+                                className={cn(
+                                  "font-medium",
+                                  selectedItem.type === "INCOME"
+                                    ? "text-emerald-700"
+                                    : "text-rose-700",
+                                )}
+                              >
+                                {selectedItem.type === "INCOME"
+                                  ? "Pemasukan"
+                                  : "Pengeluaran"}
+                              </dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-dl-muted">Dompet</dt>
+                              <dd className="text-dl-foreground">
+                                {selectedItem.wallet?.name ?? "-"}
+                              </dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-dl-muted">
+                                Tanggal Transaksi
+                              </dt>
+                              <dd className="text-dl-foreground">
+                                {formatDateWithTime(
+                                  selectedItem.trxDate.toISOString(),
+                                )}
+                              </dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-3">
+                              <dt className="text-dl-muted">Dibuat</dt>
+                              <dd className="text-dl-foreground">
+                                {formatDateWithTime(
+                                  selectedItem.createdAt.toISOString(),
+                                )}
+                              </dd>
+                            </div>
+                          </dl>
 
-              <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-                <DialogContent className="bg-white">
-                  {selectedItem && (
-                    <>
-                      <DialogHeader className="text-left">
-                        <DialogTitle className="pr-6 text-base text-dl-foreground">
-                          {selectedItem.purpose}
-                        </DialogTitle>
-                        <DialogDescription className="sr-only">
-                          Detail transaksi
-                        </DialogDescription>
-                      </DialogHeader>
-                      <dl className="space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-dl-muted">ID Transaksi</dt>
-                          <dd className="text-dl-foreground">
-                            {selectedItem.trxId}
-                          </dd>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-dl-muted">Kategori</dt>
-                          <dd
-                            className={cn(
-                              "font-medium",
-                              selectedItem.category === "INCOME"
-                                ? "text-emerald-700"
-                                : "text-rose-700",
-                            )}
-                          >
-                            {selectedItem.category === "INCOME"
-                              ? "Pemasukan"
-                              : "Pengeluaran"}
-                          </dd>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-dl-muted">Dompet</dt>
-                          <dd className="text-dl-foreground">
-                            {selectedItem.wallet?.name ?? "-"}
-                          </dd>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-dl-muted">Tanggal Transaksi</dt>
-                          <dd className="text-dl-foreground">
-                            {formatDateWithTime(
-                              selectedItem.trxDate.toISOString(),
-                            )}
-                          </dd>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="text-dl-muted">Dibuat</dt>
-                          <dd className="text-dl-foreground">
-                            {formatDateWithTime(
-                              selectedItem.createdAt.toISOString(),
-                            )}
-                          </dd>
-                        </div>
-                      </dl>
-
-                      <div className="space-y-1.5">
-                        {selectedItem.details.length > 0 && (
-                          <div className="rounded-lg bg-dl-background p-1.5">
-                            <p className="mb-1 px-1.5 text-[10px] text-dl-muted">
-                              Rincian
-                            </p>
-                            <div className="space-y-1">
-                              {selectedItem.details.map((detail) => (
-                                <div
-                                  key={detail.id}
-                                  className="flex items-center gap-2 rounded-md bg-white px-2 py-1"
-                                >
-                                  <div
-                                    className={cn(
-                                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs",
-                                      selectedItem.category === "INCOME"
-                                        ? "bg-emerald-50 text-emerald-700"
-                                        : "bg-rose-50 text-rose-700",
-                                    )}
-                                  >
-                                    <PiTag />
-                                  </div>
-                                  <p className="min-w-0 flex-1 text-[11px] font-semibold break-words text-dl-foreground">
-                                    {detail.name}
-                                  </p>
-                                  <p className="shrink-0 text-[11px] font-bold tabular-nums text-dl-foreground">
-                                    {formatCurrency(detail.amount)}
-                                  </p>
+                          <div className="space-y-1.5">
+                            {selectedItem.details.length > 0 && (
+                              <div className="rounded-lg bg-dl-background p-1.5">
+                                <p className="mb-1 px-1.5 text-[10px] text-dl-muted">
+                                  Rincian
+                                </p>
+                                <div className="space-y-1">
+                                  {selectedItem.details.map((detail) => (
+                                    <div
+                                      key={detail.id}
+                                      className="flex items-center gap-2 rounded-md bg-white px-2 py-1"
+                                    >
+                                      <div
+                                        className={cn(
+                                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs",
+                                          selectedItem.type === "INCOME"
+                                            ? "bg-emerald-50 text-emerald-700"
+                                            : "bg-rose-50 text-rose-700",
+                                        )}
+                                      >
+                                        <TransactionCategoryIcon
+                                          icon={detail.category?.icon}
+                                        />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-semibold break-words text-dl-foreground">
+                                          {detail.name}
+                                        </p>
+                                        <p className="text-[10px] text-dl-muted">
+                                          {detail.category?.name}
+                                        </p>
+                                      </div>
+                                      <p className="shrink-0 text-[11px] font-bold tabular-nums text-dl-foreground">
+                                        {formatCurrency(detail.amount)}
+                                      </p>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              </div>
+                            )}
+
+                            <div
+                              className={cn(
+                                "flex items-center justify-between rounded-lg px-3 py-2",
+                                selectedItem.type === "INCOME"
+                                  ? "bg-emerald-50"
+                                  : "bg-rose-50",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "flex items-center gap-1 text-xs font-bold",
+                                  selectedItem.type === "INCOME"
+                                    ? "text-emerald-700"
+                                    : "text-rose-700",
+                                )}
+                              >
+                                <PiCalculator className="h-3.5 w-3.5" />
+                                <span>Total</span>
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-sm font-extrabold",
+                                  selectedItem.type === "INCOME"
+                                    ? "text-emerald-700"
+                                    : "text-rose-700",
+                                )}
+                              >
+                                {formatCurrency(selectedItem.totalAmount)}
+                              </span>
                             </div>
                           </div>
-                        )}
+                          <TransactionActions
+                            item={selectedItem}
+                            variant="list"
+                          />
+                        </>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
 
-                        <div
-                          className={cn(
-                            "flex items-center justify-between rounded-lg px-3 py-2",
-                            selectedItem.category === "INCOME"
-                              ? "bg-emerald-50"
-                              : "bg-rose-50",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "flex items-center gap-1 text-xs font-bold",
-                              selectedItem.category === "INCOME"
-                                ? "text-emerald-700"
-                                : "text-rose-700",
-                            )}
+              {list && list.meta.total_item > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-dl-border px-4 py-3">
+                  <p className="text-xs text-dl-muted">
+                    Menampilkan {(list.meta.page - 1) * list.meta.limit + 1}–
+                    {Math.min(
+                      list.meta.page * list.meta.limit,
+                      list.meta.total_item,
+                    )}{" "}
+                    dari {list.meta.total_item}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={String(limit)}
+                      onValueChange={(value) => {
+                        setLimit(Number(value));
+                        setPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[80px] cursor-pointer bg-white text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[10, 20, 100].map((size) => (
+                          <SelectItem
+                            key={size}
+                            value={String(size)}
+                            className="cursor-pointer data-[state=checked]:bg-slate-100 focus:bg-slate-100 focus:text-slate-900"
                           >
-                            <PiCalculator className="h-3.5 w-3.5" />
-                            <span>Total</span>
-                          </span>
-                          <span
-                            className={cn(
-                              "text-sm font-extrabold",
-                              selectedItem.category === "INCOME"
-                                ? "text-emerald-700"
-                                : "text-rose-700",
-                            )}
-                          >
-                            {formatCurrency(selectedItem.totalAmount)}
-                          </span>
-                        </div>
-                      </div>
-                      <TransactionActions item={selectedItem} variant="list" />
-                    </>
-                  )}
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      disabled={page <= 1}
+                      onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs font-medium text-dl-foreground">
+                      {list.meta.page} / {list.meta.total_page}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      disabled={page >= list.meta.total_page}
+                      onClick={() => setPage((prev) => prev + 1)}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {list && list.meta.total_item > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-dl-border px-4 py-3">
-              <p className="text-xs text-dl-muted">
-                Menampilkan {(list.meta.page - 1) * list.meta.limit + 1}–
-                {Math.min(
-                  list.meta.page * list.meta.limit,
-                  list.meta.total_item,
-                )}{" "}
-                dari {list.meta.total_item}
-              </p>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={String(limit)}
-                  onValueChange={(value) => {
-                    setLimit(Number(value));
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[80px] cursor-pointer bg-white text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[10, 20, 100].map((size) => (
-                      <SelectItem
-                        key={size}
-                        value={String(size)}
-                        className="cursor-pointer data-[state=checked]:bg-slate-100 focus:bg-slate-100 focus:text-slate-900"
-                      >
-                        {size}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  disabled={page <= 1}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-xs font-medium text-dl-foreground">
-                  {list.meta.page} / {list.meta.total_page}
+        <TabsContent value="kategori" className="mt-4">
+          <Card className="gap-0">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-base font-semibold text-dl-foreground">
+                  <Tags className="h-4 w-4 text-dl-primary" />
+                  Detail Transaksi
+                </CardTitle>
+                <span className="text-xs font-medium text-dl-muted">
+                  Total: {formatCurrency(detailList?.totalAmount ?? 0)}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  disabled={page >= list.meta.total_page}
-                  onClick={() => setPage((prev) => prev + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent className="p-0 md:p-0">
+              <div className="flex flex-wrap gap-2 border-b border-dl-border px-4 py-4 sm:px-6">
+                <button
+                  type="button"
+                  onClick={() => setCategoryId(null)}
+                  className={cn(
+                    "cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    categoryId === null
+                      ? "border-dl-primary bg-dl-primary/10 text-dl-primary"
+                      : "border-dl-border bg-white text-dl-muted hover:text-dl-foreground",
+                  )}
+                >
+                  Semua
+                </button>
+                {categories?.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() =>
+                      setCategoryId((prev) =>
+                        prev === category.id ? null : category.id,
+                      )
+                    }
+                    className={cn(
+                      "flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      categoryId === category.id
+                        ? "border-dl-primary bg-dl-primary/10 text-dl-primary"
+                        : "border-dl-border bg-white text-dl-muted hover:text-dl-foreground",
+                    )}
+                  >
+                    <TransactionCategoryIcon
+                      icon={category.icon}
+                      className="h-3.5 w-3.5"
+                    />
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+
+              {isLoadingDetails ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-dl-muted" />
+                </div>
+              ) : (
+                <>
+                  <div className="divide-y divide-dl-border">
+                    {detailList?.items.length === 0 ? (
+                      <p className="py-10 text-center text-sm text-dl-muted">
+                        Belum ada rincian transaksi
+                      </p>
+                    ) : (
+                      detailList?.items.map((detail) => (
+                        <div
+                          key={detail.id}
+                          className="flex flex-wrap items-start gap-3 px-4 py-3 sm:flex-nowrap sm:items-center sm:px-6"
+                        >
+                          <div
+                            className={cn(
+                              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                              detail.transaction.type === "INCOME"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-rose-50 text-rose-700",
+                            )}
+                          >
+                            <TransactionCategoryIcon
+                              icon={detail.category?.icon}
+                              className="h-4 w-4"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-dl-foreground">
+                              {detail.name}
+                            </p>
+                            <p className="truncate text-[11px] text-dl-muted">
+                              {detail.category?.name ?? "Lainnya"} ·{" "}
+                              {detail.transaction.purpose}
+                            </p>
+                            <p className="text-[11px] text-dl-muted">
+                              {formatDateWithTime(
+                                detail.transaction.trxDate.toISOString(),
+                              )}
+                              {detail.transaction.wallet?.name
+                                ? ` · ${detail.transaction.wallet.name}`
+                                : ""}
+                            </p>
+                          </div>
+                          <p
+                            className={cn(
+                              "w-full shrink-0 pl-12 text-sm font-semibold tabular-nums sm:w-auto sm:pl-0",
+                              detail.transaction.type === "INCOME"
+                                ? "text-emerald-700"
+                                : "text-rose-700",
+                            )}
+                          >
+                            {formatCurrency(detail.amount)}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {detailList && detailList.meta.total_item > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-dl-border px-4 py-3">
+                      <p className="text-xs text-dl-muted">
+                        Menampilkan{" "}
+                        {(detailList.meta.page - 1) * detailList.meta.limit + 1}
+                        –
+                        {Math.min(
+                          detailList.meta.page * detailList.meta.limit,
+                          detailList.meta.total_item,
+                        )}{" "}
+                        dari {detailList.meta.total_item}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          disabled={categoryPage <= 1}
+                          onClick={() =>
+                            setCategoryPage((prev) => Math.max(1, prev - 1))
+                          }
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs font-medium text-dl-foreground">
+                          {detailList.meta.page} / {detailList.meta.total_page}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          disabled={categoryPage >= detailList.meta.total_page}
+                          onClick={() => setCategoryPage((prev) => prev + 1)}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
         <DialogContent className="bg-white">
@@ -1143,18 +1383,18 @@ const UserDashboard = () => {
               Export Excel
             </DialogTitle>
             <DialogDescription>
-              Atur kategori dan rentang tanggal transaksi yang akan diexport
+              Atur tipe transaksi dan rentang tanggal yang akan diexport
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-dl-foreground">
-                Kategori
+                Tipe Transaksi
               </label>
               <Select
-                value={exportCategory}
+                value={exportType}
                 onValueChange={(value) =>
-                  setExportCategory(value as "ALL" | "INCOME" | "EXPENSE")
+                  setexportType(value as "ALL" | "INCOME" | "EXPENSE")
                 }
               >
                 <SelectTrigger className="w-full cursor-pointer bg-white">
@@ -1162,7 +1402,7 @@ const UserDashboard = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-white">
                   <SelectItem value="ALL" className="cursor-pointer">
-                    Semua Kategori
+                    Semua Tipe
                   </SelectItem>
                   <SelectItem value="INCOME" className="cursor-pointer">
                     Pemasukan

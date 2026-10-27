@@ -11,7 +11,9 @@ import {
   NotebookPen,
   Receipt,
   Sparkles,
+  Tags,
   User,
+  Wallet,
 } from "lucide-react";
 import UserSidebarContent from "./UserSidebarContent";
 import {
@@ -37,6 +39,8 @@ const bottomNavItems = [
 ];
 
 const moreNavItems = [
+  { label: "Dompet", href: "/user/wallets", icon: Wallet },
+  { label: "Kategori", href: "/user/categories", icon: Tags },
   {
     label: "Riwayat Pembayaran",
     href: "/user/payment-history",
@@ -80,7 +84,7 @@ const UserDashboardLayout = ({ children }: Props) => {
         {bottomNavItems.map((item) => {
           const isActive = pathname === item.href;
 
-          if ("highlight" in item && item.highlight) {
+          if ("highlight" in item && item.highlight && isActive) {
             return (
               <Link
                 key={item.href}

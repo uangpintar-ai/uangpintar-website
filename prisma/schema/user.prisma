@@ -1,23 +1,24 @@
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique
-  firstName      String
-  lastName       String
-  phone          String          @unique
-  password       String?
-  balance        Float           @default(0)
-  aiSessionCount Int             @default(0)
-  maxAISession   Int
-  role           Role            @default(USER)
-  status         UserStatus      @default(UNVERIFIED)
-  packageStart   DateTime
-  packageRnd     DateTime
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  transactions   Transaction[]
-  wallets        Wallet[]
-  aiChatSessions AIChatSession[]
-  payments       Payment[]
+  id                    String                @id @default(uuid())
+  email                 String                @unique
+  firstName             String
+  lastName              String
+  phone                 String                @unique
+  password              String?
+  balance               Float                 @default(0)
+  aiSessionCount        Int                   @default(0)
+  maxAISession          Int
+  role                  Role                  @default(USER)
+  status                UserStatus            @default(UNVERIFIED)
+  packageStart          DateTime
+  packageRnd            DateTime
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+  transactions          Transaction[]
+  wallets               Wallet[]
+  transactionCategories TransactionCategory[]
+  aiChatSessions        AIChatSession[]
+  payments              Payment[]
 
   @@map("users")
 }

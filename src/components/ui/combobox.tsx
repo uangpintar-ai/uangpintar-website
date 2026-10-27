@@ -22,6 +22,7 @@ import {
 interface ComboboxOption {
   value: string;
   label: string;
+  icon?: React.ReactNode;
 }
 
 interface ComboboxProps {
@@ -70,11 +71,14 @@ export function Combobox({
           )}
           disabled={disabled}
         >
-          <p className="text-ellipsis line-clamp-1">
-            {value
-              ? options.find((option) => option.value === value)?.label
-              : placeholder}
-          </p>
+          <span className="flex min-w-0 items-center gap-2">
+            {value && options.find((option) => option.value === value)?.icon}
+            <p className="text-ellipsis line-clamp-1">
+              {value
+                ? options.find((option) => option.value === value)?.label
+                : placeholder}
+            </p>
+          </span>
           <ChevronDown
             className={cn(
               "ml-2 h-4 w-4 shrink-0 opacity-50 duration-200",
@@ -84,9 +88,9 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="p-0 z-[64]" style={{ width: contentWidth }}>
-        <Command className="max-h-[70vh]">
+        <Command className="max-h-[200px]">
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-[70vh]">
+          <CommandList className="max-h-[200px]">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
@@ -100,7 +104,10 @@ export function Combobox({
                     setOpen(false);
                   }}
                 >
-                  <span className="truncate">{option.label}</span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    {option.icon}
+                    <span className="truncate">{option.label}</span>
+                  </span>
                   <Check
                     className={cn(
                       "ml-auto h-4 w-4 shrink-0 text-slate-700",

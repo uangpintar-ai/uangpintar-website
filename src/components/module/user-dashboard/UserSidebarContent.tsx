@@ -13,6 +13,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Tags,
   Wallet,
 } from "lucide-react";
 import { UangPintarLogoNoBg } from "@/lib/images";
@@ -31,6 +32,7 @@ type Props = {
 const navItems = [
   { label: "Beranda", href: "/user/dashboard", icon: Home },
   { label: "Dompet", href: "/user/wallets", icon: Wallet },
+  { label: "Kategori", href: "/user/categories", icon: Tags },
   {
     label: "Catat Manual",
     href: "/user/manual-transaction",

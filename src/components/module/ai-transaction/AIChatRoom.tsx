@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Bot,
   CalendarDays,
+  Calculator,
   Clock,
   HelpCircle,
   Loader2,
@@ -30,8 +31,8 @@ import {
   PiFloppyDisk,
   PiPencilSimple,
   PiReceipt,
-  PiTag,
 } from "react-icons/pi";
+import { TransactionCategoryIcon } from "@/const/general/transaction-category-icons";
 import {
   Dialog,
   DialogContent,
@@ -83,6 +84,25 @@ const initialMessages: Message[] = [
 
 type TransactionDraft = Partial<TAIResponse>;
 
+type CategoryOption = { id: string; name: string; icon: string };
+
+const normalizeCategoryName = (name?: string | null) =>
+  (name ?? "")
+    .toLowerCase()
+    .replace(/&/g, " dan ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const findCategory = (
+  categories: CategoryOption[] | undefined,
+  name?: string | null,
+) => {
+  const target = normalizeCategoryName(name);
+  return categories?.find(
+    (category) => normalizeCategoryName(category.name) === target,
+  );
+};
+
 const toDateInput = (d: Date) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -117,7 +137,7 @@ const toAmount = (value: string | number | null | undefined) => {
   return Number(String(value ?? "").replace(/\D/g, "")) || 0;
 };
 
-const normalizeCategory = (value: unknown): "INCOME" | "EXPENSE" | null => {
+const normalizeType = (value: unknown): "INCOME" | "EXPENSE" | null => {
   if (typeof value !== "string") return null;
   const v = value.trim().toUpperCase();
   if (v === "INCOME" || v === "EXPENSE") return v;
@@ -128,11 +148,15 @@ const normalizeCategory = (value: unknown): "INCOME" | "EXPENSE" | null => {
 
 const getValidDetails = (data: Partial<TAIResponse>) =>
   (data.details ?? [])
-    .map((d) => ({ name: (d.name ?? "").trim(), amount: toAmount(d.amount) }))
+    .map((d) => ({
+      name: (d.name ?? "").trim(),
+      amount: toAmount(d.amount),
+      category: d.category?.trim() || null,
+    }))
     .filter((d) => d.name.length > 0 && d.amount > 0);
 
 const isComplete = (data: Partial<TAIResponse>) =>
-  normalizeCategory(data.category) !== null &&
+  normalizeType(data.type) !== null &&
   !!data.purpose?.trim() &&
   getValidDetails(data).length > 0;
 
@@ -159,23 +183,37 @@ const minutes = Array.from({ length: 60 }, (_, i) =>
 
 type DraftEditModalProps = {
   draft: TransactionDraft;
+  categories: CategoryOption[];
+  walletOptions: { value: string; label: string }[];
+  walletId: string;
   onClose: () => void;
-  onSave: (draft: TransactionDraft) => void;
+  onSave: (draft: TransactionDraft, walletId: string) => void;
 };
 
-const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
+const DraftEditModal = ({
+  draft,
+  categories,
+  walletOptions,
+  walletId,
+  onClose,
+  onSave,
+}: DraftEditModalProps) => {
   const initialDate = draftDate(draft) ?? new Date();
-  const [category, setCategory] = useState<"INCOME" | "EXPENSE">(
-    draft.category === "INCOME" ? "INCOME" : "EXPENSE",
+  const [wallet, setWallet] = useState(walletId);
+  const [type, setType] = useState<"INCOME" | "EXPENSE">(
+    draft.type === "INCOME" ? "INCOME" : "EXPENSE",
   );
   const [purpose, setPurpose] = useState(draft.purpose ?? "");
-  const [details, setDetails] = useState<{ name: string; amount: string }[]>(
+  const [details, setDetails] = useState<
+    { name: string; amount: string; categoryId: string }[]
+  >(
     draft.details && draft.details.length > 0
       ? draft.details.map((d) => ({
           name: d.name ?? "",
           amount: d.amount != null ? String(d.amount) : "",
+          categoryId: findCategory(categories, d.category)?.id ?? "",
         }))
-      : [{ name: "", amount: "" }],
+      : [{ name: "", amount: "", categoryId: categories[0]?.id ?? "" }],
   );
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(toTimeInput(initialDate));
@@ -187,14 +225,17 @@ const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
 
   const updateDetail = (
     index: number,
-    patch: Partial<{ name: string; amount: string }>,
+    patch: Partial<{ name: string; amount: string; categoryId: string }>,
   ) =>
     setDetails((prev) =>
       prev.map((d, i) => (i === index ? { ...d, ...patch } : d)),
     );
 
   const addDetail = () =>
-    setDetails((prev) => [...prev, { name: "", amount: "" }]);
+    setDetails((prev) => [
+      ...prev,
+      { name: "", amount: "", categoryId: categories[0]?.id ?? "" },
+    ]);
 
   const removeDetail = (index: number) =>
     setDetails((prev) =>
@@ -208,8 +249,8 @@ const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="bg-white">
-        <DialogHeader>
+      <DialogContent className="bg-white sm:max-w-2xl !p-0 overflow-hidden flex flex-col justify-between">
+        <DialogHeader className="z-10 border-b border-dl-border bg-white p-4 text-left">
           <DialogTitle className="text-dl-foreground">
             Edit Transaksi
           </DialogTitle>
@@ -217,60 +258,120 @@ const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
             Perbarui detail sebelum mencatat transaksi
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setCategory("INCOME")}
-              className={cn(
-                "flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                category === "INCOME"
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                  : "border-dl-border bg-white text-dl-muted hover:border-dl-border/60",
-              )}
-            >
-              <TrendingUp className="h-4 w-4" />
-              Pemasukan
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategory("EXPENSE")}
-              className={cn(
-                "flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                category === "EXPENSE"
-                  ? "border-rose-500 bg-rose-50 text-rose-700"
-                  : "border-dl-border bg-white text-dl-muted hover:border-dl-border/60",
-              )}
-            >
-              <TrendingDown className="h-4 w-4" />
-              Pengeluaran
-            </button>
+        <div className="min-h-0 space-y-4 flex-1 overflow-auto px-4">
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-dl-foreground">Dompet</p>
+            <Combobox
+              options={walletOptions}
+              value={wallet}
+              onChange={(value) => value && setWallet(value)}
+              placeholder="Pilih dompet"
+              searchPlaceholder="Cari dompet..."
+              emptyText="Dompet tidak ditemukan"
+              className="bg-white"
+            />
           </div>
 
-          <Textarea
-            rows={2}
-            placeholder="Keterangan transaksi"
-            className="resize-none bg-white"
-            value={purpose}
-            onChange={(e) => setPurpose(e.target.value)}
-          />
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-dl-foreground">
+              Tipe Transaksi
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setType("INCOME")}
+                className={cn(
+                  "flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                  type === "INCOME"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-dl-border bg-white text-dl-muted hover:border-dl-border/60",
+                )}
+              >
+                <TrendingUp className="h-4 w-4" />
+                Pemasukan
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("EXPENSE")}
+                className={cn(
+                  "flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                  type === "EXPENSE"
+                    ? "border-rose-500 bg-rose-50 text-rose-700"
+                    : "border-dl-border bg-white text-dl-muted hover:border-dl-border/60",
+                )}
+              >
+                <TrendingDown className="h-4 w-4" />
+                Pengeluaran
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-dl-foreground">Keterangan</p>
+            <Textarea
+              rows={2}
+              placeholder="Keterangan transaksi"
+              className="resize-none bg-white"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+            />
+          </div>
 
           <div className="space-y-2">
+            <p className="text-sm font-medium text-dl-foreground">Rincian</p>
             {details.map((detail, index) => (
               <div
                 key={index}
-                className="flex flex-col gap-2 rounded-lg border border-dl-border p-3 sm:flex-row sm:items-start sm:gap-2 sm:rounded-none sm:border-0 sm:p-0"
+                className="flex flex-col gap-3 rounded-xl border border-dl-border bg-dl-background/60 p-3 sm:flex-row sm:items-start sm:gap-2 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
               >
-                <Input
-                  placeholder="Nama rincian"
-                  className="w-full bg-white sm:flex-1"
-                  value={detail.name}
-                  onChange={(e) =>
-                    updateDetail(index, { name: e.target.value })
-                  }
-                />
-                <div className="flex items-start gap-2 sm:contents">
-                  <div className="flex-1 sm:w-40 sm:flex-none">
+                <div className="flex items-center justify-between sm:hidden">
+                  <span className="text-xs font-semibold text-dl-muted">
+                    Rincian {index + 1}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={details.length === 1}
+                    onClick={() => removeDetail(index)}
+                    aria-label="Hapus rincian"
+                    className="h-8 w-8 text-dl-muted hover:bg-dl-error/10 hover:text-dl-error"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-col gap-2 sm:contents">
+                  <Input
+                    placeholder="Nama rincian"
+                    className="w-full bg-white sm:flex-1"
+                    value={detail.name}
+                    onChange={(e) =>
+                      updateDetail(index, { name: e.target.value })
+                    }
+                  />
+                  <div className="w-full sm:w-44 sm:flex-none">
+                    <Combobox
+                      options={categories.map((category) => ({
+                        value: category.id,
+                        label: category.name,
+                        icon: (
+                          <TransactionCategoryIcon
+                            icon={category.icon}
+                            className="h-4 w-4 shrink-0"
+                          />
+                        ),
+                      }))}
+                      value={detail.categoryId}
+                      onChange={(value) =>
+                        value && updateDetail(index, { categoryId: value })
+                      }
+                      placeholder="Pilih kategori"
+                      searchPlaceholder="Cari kategori..."
+                      emptyText="Kategori tidak ditemukan"
+                      className="bg-white"
+                    />
+                  </div>
+                  <div className="w-full sm:w-40 sm:flex-none">
                     <InputMoney
                       placeholder="50000"
                       value={detail.amount}
@@ -286,7 +387,7 @@ const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
                     disabled={details.length === 1}
                     onClick={() => removeDetail(index)}
                     aria-label="Hapus rincian"
-                    className="mt-0.5 shrink-0 text-dl-muted hover:bg-dl-error/10 hover:text-dl-error"
+                    className="mt-0.5 hidden shrink-0 text-dl-muted hover:bg-dl-error/10 hover:text-dl-error sm:inline-flex"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -298,103 +399,130 @@ const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
               variant="outline"
               size="sm"
               onClick={addDetail}
-              className="gap-2 border-dashed border-dl-border text-dl-muted"
+              className="h-10 w-full gap-2 border-dashed border-dl-border text-dl-muted sm:h-8 sm:w-auto"
             >
               <Plus className="h-4 w-4" />
               Tambah Rincian
             </Button>
-            <div className="flex items-center justify-between border-t border-dl-border pt-2 text-sm">
-              <span className="text-dl-muted">Total</span>
-              <span className="font-semibold text-dl-foreground">
+            <div className="flex items-center justify-between rounded-xl border border-dl-border bg-white px-3 py-2.5">
+              <span className="flex items-center gap-2 text-sm font-medium text-dl-muted">
+                <Calculator className="h-4 w-4 text-dl-primary" />
+                Total
+              </span>
+              <span className="text-base font-bold text-dl-foreground">
                 {formatCurrency(total)}
               </span>
             </div>
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 border-dl-border bg-white text-left font-normal text-dl-foreground"
-              >
-                <CalendarDays className="h-4 w-4 text-dl-primary" />
-                {date ? formatDate(date.toISOString()) : "Pilih tanggal"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto bg-white p-0">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={(d) => d && setDate(d)}
-                className="bg-white"
-              />
-            </PopoverContent>
-          </Popover>
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-dl-foreground">
+              Tanggal {type === "INCOME" ? "Pemasukan" : "Pengeluaran"}
+            </p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 border-dl-border bg-white text-left font-normal text-dl-foreground"
+                >
+                  <CalendarDays className="h-4 w-4 text-dl-primary" />
+                  {date ? formatDate(date.toISOString()) : "Pilih tanggal"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto bg-white p-0">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(d) => d && setDate(d)}
+                  className="bg-white"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 border-dl-border bg-white text-left font-normal text-dl-foreground"
-              >
-                <Clock className="h-4 w-4 text-dl-primary" />
-                {time} WIB
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto bg-white p-3">
-              <div className="flex items-center gap-2">
-                <Select
-                  value={time.slice(0, 2)}
-                  onValueChange={(h) => setTime(`${h}${time.slice(2)}`)}
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-dl-foreground">
+              Jam {type === "INCOME" ? "Pemasukan" : "Pengeluaran"} (WIB)
+            </p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 border-dl-border bg-white text-left font-normal text-dl-foreground"
                 >
-                  <SelectTrigger className="w-20 cursor-pointer bg-white">
-                    <SelectValue placeholder="Jam" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {hours.map((h) => (
-                      <SelectItem key={h} value={h} className="cursor-pointer">
-                        {h}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <span className="text-dl-muted">:</span>
-                <Select
-                  value={time.slice(3)}
-                  onValueChange={(m) => setTime(`${time.slice(0, 3)}${m}`)}
-                >
-                  <SelectTrigger className="w-20 cursor-pointer bg-white">
-                    <SelectValue placeholder="Menit" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {minutes.map((m) => (
-                      <SelectItem key={m} value={m} className="cursor-pointer">
-                        {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </PopoverContent>
-          </Popover>
+                  <Clock className="h-4 w-4 text-dl-primary" />
+                  {time} WIB
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-auto bg-white p-3">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={time.slice(0, 2)}
+                    onValueChange={(h) => setTime(`${h}${time.slice(2)}`)}
+                  >
+                    <SelectTrigger className="w-20 cursor-pointer bg-white">
+                      <SelectValue placeholder="Jam" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {hours.map((h) => (
+                        <SelectItem
+                          key={h}
+                          value={h}
+                          className="cursor-pointer"
+                        >
+                          {h}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-dl-muted">:</span>
+                  <Select
+                    value={time.slice(3)}
+                    onValueChange={(m) => setTime(`${time.slice(0, 3)}${m}`)}
+                  >
+                    <SelectTrigger className="w-20 cursor-pointer bg-white">
+                      <SelectValue placeholder="Menit" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {minutes.map((m) => (
+                        <SelectItem
+                          key={m}
+                          value={m}
+                          className="cursor-pointer"
+                        >
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="z-10 border-t border-dl-border bg-white p-4 grid grid-cols-2">
           <Button variant="outline" onClick={onClose}>
             Batal
           </Button>
           <Button
             onClick={() =>
-              onSave({
-                ...draft,
-                category,
-                purpose: purpose.trim(),
-                details: details.map((d) => ({
-                  name: d.name.trim(),
-                  amount: d.amount,
-                })),
-                trxDate: toDateInput(date),
-                trxTime: time,
-              })
+              onSave(
+                {
+                  ...draft,
+                  type,
+                  purpose: purpose.trim(),
+                  details: details.map((d) => ({
+                    name: d.name.trim(),
+                    amount: d.amount,
+                    category:
+                      categories.find((c) => c.id === d.categoryId)?.name ??
+                      null,
+                  })),
+                  trxDate: toDateInput(date),
+                  trxTime: time,
+                },
+                wallet,
+              )
             }
             disabled={!canSave}
             className="bg-gradient-to-r from-dl-gradient-2 to-dl-primary text-white"
@@ -408,31 +536,25 @@ const DraftEditModal = ({ draft, onClose, onSave }: DraftEditModalProps) => {
   );
 };
 
-const DETAIL_ICON = PiTag;
-
 type TransactionCardProps = {
   draft: TransactionDraft;
+  categories: CategoryOption[];
   showActions: boolean;
   saving: boolean;
   onSave: () => void;
   onEdit: () => void;
-  walletOptions: { value: string; label: string }[];
-  walletId: string;
-  onWalletChange: (value: string) => void;
 };
 
 const TransactionCard = ({
   draft,
+  categories,
   showActions,
   saving,
   onSave,
   onEdit,
-  walletOptions,
-  walletId,
-  onWalletChange,
 }: TransactionCardProps) => {
-  const category = normalizeCategory(draft.category);
-  const isIncome = category === "INCOME";
+  const type = normalizeType(draft.type);
+  const isIncome = type === "INCOME";
   const details = (draft.details ?? []).filter(
     (d) => d.name || d.amount != null,
   );
@@ -478,7 +600,7 @@ const TransactionCard = ({
             <TrendingDown className="h-3 w-3 shrink-0" />
           )}
           <span className="break-words whitespace-normal">
-            {category ? (isIncome ? "Pemasukan" : "Pengeluaran") : "-"}
+            {type ? (isIncome ? "Pemasukan" : "Pengeluaran") : "-"}
           </span>
         </span>
       </div>
@@ -488,29 +610,39 @@ const TransactionCard = ({
           <div className="mt-2 rounded-lg bg-dl-background p-1.5">
             <p className="mb-1 px-1.5 text-[10px] text-dl-muted">Rincian</p>
             <div className="space-y-1">
-              {details.map((detail, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 rounded-md bg-white px-2 py-1"
-                >
+              {details.map((detail, index) => {
+                const category = findCategory(categories, detail.category);
+                const categoryName =
+                  category?.name ?? (detail.category?.trim() || "Lainnya");
+                return (
                   <div
-                    className={cn(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs",
-                      isIncome
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-rose-50 text-rose-700",
-                    )}
+                    key={index}
+                    className="flex items-center gap-2 rounded-md bg-white px-2 py-1"
                   >
-                    <DETAIL_ICON />
+                    <div
+                      className={cn(
+                        "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-xs",
+                        isIncome
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-rose-50 text-rose-700",
+                      )}
+                    >
+                      <TransactionCategoryIcon icon={category?.icon} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold break-words text-dl-foreground">
+                        {detail.name || "-"}
+                      </p>
+                      <p className="text-[10px] text-dl-muted">
+                        {categoryName}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[11px] font-bold tabular-nums text-dl-foreground">
+                      {formatCurrency(toAmount(detail.amount))}
+                    </p>
                   </div>
-                  <p className="min-w-0 flex-1 text-[11px] font-semibold break-words text-dl-foreground">
-                    {detail.name || "-"}
-                  </p>
-                  <p className="shrink-0 text-[11px] font-bold tabular-nums text-dl-foreground">
-                    {formatCurrency(toAmount(detail.amount))}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -553,20 +685,6 @@ const TransactionCard = ({
 
       {showActions && (
         <>
-          <div className="mt-2">
-            <p className="mb-1 text-[10px] text-dl-muted">Dompet</p>
-            <Combobox
-              options={walletOptions}
-              value={walletId}
-              onChange={(value) => {
-                if (value) onWalletChange(value);
-              }}
-              placeholder="Pilih dompet"
-              searchPlaceholder="Cari dompet..."
-              emptyText="Dompet tidak ditemukan"
-              className="h-8 bg-white text-xs"
-            />
-          </div>
           <p className="mt-2 text-xs text-dl-foreground">
             Apakah kamu mau catat transaksinya?
           </p>
@@ -608,6 +726,7 @@ const AIChatRoom = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const { data: wallets } = api.wallet.findAll.useQuery();
+  const { data: categories } = api.category.findAll.useQuery();
   const isFreeTier = session?.user?.status === "GRATIS";
   const [walletId, setWalletId] = useState("");
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -648,7 +767,10 @@ const AIChatRoom = () => {
       const loaded: Message[] = [...initialMessages];
       for (const detail of session.details) {
         const response = detail.response as unknown as TAIResponse;
-        mergeResponse(draft, response);
+        mergeResponse(draft, {
+          ...response,
+          type: response.type ?? response.category ?? null,
+        });
         loaded.push({ id: ++lastId, role: "user", content: detail.prompt });
         loaded.push({
           id: ++lastId,
@@ -896,17 +1018,21 @@ const AIChatRoom = () => {
   const voiceExhausted = remainingVoice <= 0;
 
   const saveDraft = () => {
-    const category = normalizeCategory(aiResponseRef.current.category);
+    const type = normalizeType(aiResponseRef.current.type);
     const purpose = aiResponseRef.current.purpose?.trim();
     const details = getValidDetails(aiResponseRef.current);
-    if (!category || !purpose || details.length === 0) {
+    if (!type || !purpose || details.length === 0) {
       toastError("Gagal!", "Data transaksi belum lengkap atau tidak valid");
       return;
     }
     createTransaction.mutate({
-      category,
+      type,
       purpose,
-      details,
+      details: details.map((detail) => ({
+        name: detail.name,
+        amount: detail.amount,
+        categoryId: findCategory(categories, detail.category)?.id,
+      })),
       trx_date: draftDate(aiResponseRef.current) ?? new Date(),
       walletId: walletId || undefined,
     });
@@ -1089,18 +1215,11 @@ const AIChatRoom = () => {
                 </div>
                 <TransactionCard
                   draft={message.draft}
+                  categories={categories ?? []}
                   showActions={isLast && isComplete(message.draft)}
                   saving={createTransaction.isPending}
                   onSave={saveDraft}
                   onEdit={() => setEditOpen(true)}
-                  walletOptions={
-                    wallets?.map((wallet) => ({
-                      value: wallet.id,
-                      label: wallet.name,
-                    })) ?? []
-                  }
-                  walletId={walletId}
-                  onWalletChange={setWalletId}
                 />
               </div>
             );
@@ -1261,9 +1380,18 @@ const AIChatRoom = () => {
       {editOpen && (
         <DraftEditModal
           draft={{ ...aiResponseRef.current }}
+          categories={categories ?? []}
+          walletOptions={
+            wallets?.map((wallet) => ({
+              value: wallet.id,
+              label: `${wallet.name} - ${formatCurrency(wallet.balance)}`,
+            })) ?? []
+          }
+          walletId={walletId}
           onClose={() => setEditOpen(false)}
-          onSave={(draft) => {
+          onSave={(draft, nextWalletId) => {
             aiResponseRef.current = draft;
+            setWalletId(nextWalletId);
             setMessages((prev) =>
               prev.map((m, idx) =>
                 idx === prev.length - 1

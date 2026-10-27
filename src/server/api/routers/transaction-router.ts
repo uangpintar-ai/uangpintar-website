@@ -7,6 +7,7 @@ import {
   transactionUpdateSchema,
 } from "@/schema/transaction-schema";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import {
   createTransaction,
@@ -55,7 +56,7 @@ export const transactionRouter = createTRPCRouter({
               ],
             }
           : {}),
-        ...(input.category ? { category: input.category } : {}),
+        ...(input.type ? { type: input.type } : {}),
         ...(input.walletIds?.length
           ? { walletId: { in: input.walletIds } }
           : {}),
@@ -64,7 +65,10 @@ export const transactionRouter = createTRPCRouter({
         ctx.db.transaction.findMany({
           where,
           include: {
-            details: { orderBy: { createdAt: "asc" } },
+            details: {
+              orderBy: { createdAt: "asc" },
+              include: { category: true },
+            },
             wallet: { select: { name: true } },
           },
           skip: (input.page - 1) * input.limit,
@@ -75,6 +79,66 @@ export const transactionRouter = createTRPCRouter({
       ]);
       return {
         items,
+        meta: {
+          page: input.page,
+          limit: input.limit,
+          total_page: Math.ceil(total / input.limit),
+          total_item: total,
+        },
+      };
+    }),
+
+  findDetails: protectedProcedure
+    .input(
+      transactionFilterSchema.extend({
+        categoryId: z.string().optional().nullable(),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      const dateFilter = {
+        ...(input.start_date ? { gte: input.start_date } : {}),
+        ...(input.end_date ? { lte: input.end_date } : {}),
+      };
+      const transactionWhere: Prisma.TransactionWhereInput = {
+        userId: ctx.session.userId,
+        ...(input.date_type === "created"
+          ? { createdAt: dateFilter }
+          : { trxDate: dateFilter }),
+        ...(input.type ? { type: input.type } : {}),
+        ...(input.walletIds?.length
+          ? { walletId: { in: input.walletIds } }
+          : {}),
+      };
+      const where: Prisma.TransactionDetailWhereInput = {
+        transaction: transactionWhere,
+        ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+      };
+      const [items, total, amount] = await Promise.all([
+        ctx.db.transactionDetail.findMany({
+          where,
+          include: {
+            category: true,
+            transaction: {
+              select: {
+                id: true,
+                trxId: true,
+                purpose: true,
+                type: true,
+                trxDate: true,
+                wallet: { select: { name: true } },
+              },
+            },
+          },
+          orderBy: [{ transaction: { trxDate: "desc" } }, { createdAt: "asc" }],
+          skip: (input.page - 1) * input.limit,
+          take: input.limit,
+        }),
+        ctx.db.transactionDetail.count({ where }),
+        ctx.db.transactionDetail.aggregate({ where, _sum: { amount: true } }),
+      ]);
+      return {
+        items,
+        totalAmount: amount._sum.amount ?? 0,
         meta: {
           page: input.page,
           limit: input.limit,
@@ -119,7 +183,7 @@ export const transactionRouter = createTRPCRouter({
               ],
             }
           : {}),
-        ...(input.category ? { category: input.category } : {}),
+        ...(input.type ? { type: input.type } : {}),
       };
       const [items, total] = await Promise.all([
         ctx.db.transaction.findMany({
@@ -156,7 +220,12 @@ export const transactionRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const transaction = await ctx.db.transaction.findFirst({
         where: { id: input.id, userId: ctx.session.userId },
-        include: { details: { orderBy: { createdAt: "asc" } } },
+        include: {
+          details: {
+            orderBy: { createdAt: "asc" },
+            include: { category: true },
+          },
+        },
       });
       if (!transaction) throw new TRPCError({ code: "NOT_FOUND" });
       return transaction;
@@ -171,7 +240,7 @@ export const transactionRouter = createTRPCRouter({
           ...(input.start_date ? { gte: input.start_date } : {}),
           ...(input.end_date ? { lte: input.end_date } : {}),
         },
-        ...(input.category ? { category: input.category } : {}),
+        ...(input.type ? { type: input.type } : {}),
         ...(input.walletIds?.length
           ? { walletId: { in: input.walletIds } }
           : {}),
@@ -179,7 +248,7 @@ export const transactionRouter = createTRPCRouter({
       const [transactions, user, wallets] = await Promise.all([
         ctx.db.transaction.findMany({
           where,
-          select: { totalAmount: true, category: true },
+          select: { totalAmount: true, type: true },
         }),
         ctx.db.user.findUnique({
           where: { id: ctx.session.userId },
@@ -195,8 +264,8 @@ export const transactionRouter = createTRPCRouter({
             })
           : null,
       ]);
-      const income = transactions.filter((t) => t.category === "INCOME");
-      const expense = transactions.filter((t) => t.category === "EXPENSE");
+      const income = transactions.filter((t) => t.type === "INCOME");
+      const expense = transactions.filter((t) => t.type === "EXPENSE");
       return {
         balance: input.walletIds?.length
           ? (wallets?._sum.balance ?? 0)

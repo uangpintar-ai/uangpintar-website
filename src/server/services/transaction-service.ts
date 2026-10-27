@@ -2,6 +2,7 @@ import { randomInt } from "crypto";
 import { TRPCError } from "@trpc/server";
 import { db } from "@/server/db";
 import { ensureDefaultWallet } from "@/server/services/wallet-service";
+import { ensureDefaultCategory } from "@/server/services/category-service";
 
 const ALPHANUMERIC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
@@ -18,19 +19,48 @@ export const generateTrxId = () => {
   return `TRX-${code}`;
 };
 
+export type TransactionDetailInput = {
+  name: string;
+  amount: string | number;
+  categoryId?: string | null;
+};
+
 export const mapDetails = (
-  details: { name: string; amount: string | number }[],
-) => details.map((d) => ({ name: d.name, amount: toFloat(d.amount) }));
+  details: TransactionDetailInput[],
+  fallbackCategoryId: string,
+  categoryIds: Set<string>,
+) =>
+  details.map((d) => ({
+    name: d.name,
+    amount: toFloat(d.amount),
+    categoryId:
+      d.categoryId && categoryIds.has(d.categoryId)
+        ? d.categoryId
+        : fallbackCategoryId,
+  }));
 
 export const sumDetails = (details: { amount: number }[]) =>
   details.reduce((sum, d) => sum + d.amount, 0);
 
 export type TransactionInput = {
-  category: "INCOME" | "EXPENSE";
+  type: "INCOME" | "EXPENSE";
   purpose: string;
-  details: { name: string; amount: string | number }[];
+  details: TransactionDetailInput[];
   trx_date?: Date | null;
   walletId?: string | null;
+};
+
+const resolveCategories = async (userId: string) => {
+  const categories = await db.transactionCategory.findMany({
+    where: { userId },
+    select: { id: true },
+  });
+  const fallbackCategoryId =
+    categories[0]?.id ?? (await ensureDefaultCategory(db, userId)).id;
+  return {
+    fallbackCategoryId,
+    categoryIds: new Set(categories.map((category) => category.id)),
+  };
 };
 
 const resolveWallet = async (userId: string, walletId?: string | null) => {
@@ -52,9 +82,10 @@ export const createTransaction = async (
   input: TransactionInput,
 ) => {
   const wallet = await resolveWallet(userId, input.walletId);
-  const details = mapDetails(input.details);
+  const { fallbackCategoryId, categoryIds } = await resolveCategories(userId);
+  const details = mapDetails(input.details, fallbackCategoryId, categoryIds);
   const totalAmount = sumDetails(details);
-  const balanceDelta = input.category === "INCOME" ? totalAmount : -totalAmount;
+  const balanceDelta = input.type === "INCOME" ? totalAmount : -totalAmount;
   await db.$transaction([
     db.transaction.create({
       data: {
@@ -62,7 +93,7 @@ export const createTransaction = async (
         walletId: wallet.id,
         trxId: generateTrxId(),
         trxDate: input.trx_date ?? new Date(),
-        category: input.category,
+        type: input.type,
         purpose: input.purpose,
         totalAmount,
         details: { create: details },
@@ -102,12 +133,11 @@ export const updateTransaction = async (
   }
 
   const oldDelta =
-    existing.category === "INCOME"
-      ? existing.totalAmount
-      : -existing.totalAmount;
-  const details = mapDetails(input.details);
+    existing.type === "INCOME" ? existing.totalAmount : -existing.totalAmount;
+  const { fallbackCategoryId, categoryIds } = await resolveCategories(userId);
+  const details = mapDetails(input.details, fallbackCategoryId, categoryIds);
   const newAmount = sumDetails(details);
-  const newDelta = input.category === "INCOME" ? newAmount : -newAmount;
+  const newDelta = input.type === "INCOME" ? newAmount : -newAmount;
 
   const walletUpdates =
     wallet.id === targetWallet.id
@@ -134,7 +164,7 @@ export const updateTransaction = async (
       data: {
         walletId: targetWallet.id,
         trxDate: input.trx_date ?? undefined,
-        category: input.category,
+        type: input.type,
         purpose: input.purpose,
         totalAmount: newAmount,
         details: { deleteMany: {}, create: details },
@@ -158,9 +188,7 @@ export const deleteTransaction = async (userId: string, id: string) => {
       ? await db.wallet.findFirst({ where: { id: existing.walletId, userId } })
       : null) ?? (await ensureDefaultWallet(db, userId));
   const balanceDelta =
-    existing.category === "INCOME"
-      ? -existing.totalAmount
-      : existing.totalAmount;
+    existing.type === "INCOME" ? -existing.totalAmount : existing.totalAmount;
   await db.$transaction([
     db.transaction.deleteMany({ where: { id, userId } }),
     db.wallet.update({

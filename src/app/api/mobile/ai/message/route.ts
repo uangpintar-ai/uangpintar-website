@@ -11,6 +11,7 @@ import {
 } from "@/server/services/ai-service";
 
 type Draft = {
+  type?: string | null;
   category?: string | null;
   purpose?: string | null;
   details?: { name?: string | null; amount?: string | number | null }[] | null;
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
   );
 
   const parsed = parseAIResponse(content);
+  if (parsed.type == null) parsed.type = parsed.category ?? null;
 
   await db.aIChatSessionDetail.create({
     data: {

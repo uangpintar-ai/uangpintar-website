@@ -11,6 +11,7 @@ import {
 import { checkoutLeadSchema } from "@/schema/payment-schema";
 import { applyPlan } from "@/server/services/payment-service";
 import { DEFAULT_WALLET_NAME } from "@/server/services/wallet-service";
+import { DEFAULT_CATEGORIES } from "@/server/services/category-service";
 
 type CheckoutBody = {
   plan?: string;
@@ -182,6 +183,13 @@ export const POST = async (request: Request) => {
             packageStart: new Date(),
             packageRnd: new Date(),
             wallets: { create: { name: DEFAULT_WALLET_NAME } },
+            transactionCategories: {
+              create: DEFAULT_CATEGORIES.map((category) => ({
+                name: category.name,
+                icon: category.icon,
+                sortOrder: category.sortOrder,
+              })),
+            },
           },
           select: {
             id: true,

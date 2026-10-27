@@ -1,0 +1,15 @@
+model TransactionCategory {
+  id        String              @id @default(uuid())
+  userId    String
+  name      String
+  icon      String              @default("PiTag")
+  sortOrder Int                 @default(0) @map("sort_order")
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  details   TransactionDetail[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("transaction_categories")
+}

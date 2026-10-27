@@ -27,6 +27,7 @@ import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
 import type { Role } from "@prisma/client";
 import { DEFAULT_WALLET_NAME } from "@/server/services/wallet-service";
+import { DEFAULT_CATEGORIES } from "@/server/services/category-service";
 
 const generateCode = () => randomInt(100000, 999999).toString();
 
@@ -91,6 +92,13 @@ export const userRouter = createTRPCRouter({
               packageStart: new Date(),
               packageRnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
               wallets: { create: { name: DEFAULT_WALLET_NAME } },
+              transactionCategories: {
+                create: DEFAULT_CATEGORIES.map((category) => ({
+                  name: category.name,
+                  icon: category.icon,
+                  sortOrder: category.sortOrder,
+                })),
+              },
             },
           });
           await sendAndStoreCode({

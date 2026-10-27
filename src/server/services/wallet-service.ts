@@ -5,18 +5,17 @@ export const DEFAULT_WALLET_NAME = "Dompet Utama";
 type DB = typeof db;
 
 const netAmount = (
-  transactions: { totalAmount: number; category: "INCOME" | "EXPENSE" }[],
+  transactions: { totalAmount: number; type: "INCOME" | "EXPENSE" }[],
 ) =>
   transactions.reduce(
-    (sum, t) =>
-      sum + (t.category === "INCOME" ? t.totalAmount : -t.totalAmount),
+    (sum, t) => sum + (t.type === "INCOME" ? t.totalAmount : -t.totalAmount),
     0,
   );
 
 const pendingTransactions = (client: DB, userId: string) =>
   client.transaction.findMany({
     where: { userId, walletId: null },
-    select: { totalAmount: true, category: true },
+    select: { totalAmount: true, type: true },
   });
 
 const migratePendingTransactions = async (

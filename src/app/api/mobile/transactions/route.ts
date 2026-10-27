@@ -21,11 +21,9 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, Number(sp.get("page")) || 1);
   const limit = Math.max(1, Number(sp.get("limit")) || 10);
   const search = sp.get("search") || undefined;
-  const categoryRaw = sp.get("category");
-  const category =
-    categoryRaw === "INCOME" || categoryRaw === "EXPENSE"
-      ? categoryRaw
-      : undefined;
+  const typeRaw = sp.get("type");
+  const type =
+    typeRaw === "INCOME" || typeRaw === "EXPENSE" ? typeRaw : undefined;
   const date_type = sp.get("date_type") || undefined;
   const start_date = toDate(sp.get("start_date"));
   const end_date = toDate(sp.get("end_date"));
@@ -54,7 +52,7 @@ export async function GET(req: NextRequest) {
           ],
         }
       : {}),
-    ...(category ? { category } : {}),
+    ...(type ? { type } : {}),
   };
 
   const [items, total] = await Promise.all([
@@ -84,12 +82,12 @@ export async function POST(req: NextRequest) {
   if (!claims?.userId) return fail("Unauthorized", 401);
 
   const body = await req.json().catch(() => null);
-  const category = body?.category;
+  const type = body?.type;
   const purpose = str(body?.purpose).trim();
   const details = Array.isArray(body?.details) ? body.details : [];
 
-  if (category !== "INCOME" && category !== "EXPENSE") {
-    return fail("Kategori tidak valid", 400);
+  if (type !== "INCOME" && type !== "EXPENSE") {
+    return fail("Tipe transaksi tidak valid", 400);
   }
   if (!purpose) return fail("Keterangan harus diisi", 400);
   if (details.length === 0) return fail("Minimal satu rincian", 400);
@@ -104,7 +102,7 @@ export async function POST(req: NextRequest) {
   }
 
   const input: TransactionInput = {
-    category,
+    type,
     purpose,
     details,
     trx_date: body?.trx_date ? new Date(body.trx_date) : null,

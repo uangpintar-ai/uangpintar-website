@@ -1,11 +1,14 @@
 model TransactionDetail {
-  id            String      @id @default(uuid())
+  id            String               @id @default(uuid())
   transactionId String
+  categoryId    String
   name          String
   amount        Float
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
+  transaction   Transaction          @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category      TransactionCategory? @relation(fields: [categoryId], references: [id])
 
+  @@index([categoryId])
   @@map("transaction_details")
 }

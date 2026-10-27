@@ -14,18 +14,18 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   const { id } = await ctx.params;
   const body = await req.json().catch(() => null);
-  const category = body?.category;
+  const type = body?.type;
   const purpose = str(body?.purpose).trim();
   const details = Array.isArray(body?.details) ? body.details : [];
 
-  if (category !== "INCOME" && category !== "EXPENSE") {
-    return fail("Kategori tidak valid", 400);
+  if (type !== "INCOME" && type !== "EXPENSE") {
+    return fail("Tipe transaksi tidak valid", 400);
   }
   if (!purpose) return fail("Keterangan harus diisi", 400);
   if (details.length === 0) return fail("Minimal satu rincian", 400);
 
   const input: TransactionInput = {
-    category,
+    type,
     purpose,
     details,
     trx_date: body?.trx_date ? new Date(body.trx_date) : null,

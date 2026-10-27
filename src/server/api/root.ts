@@ -5,6 +5,7 @@ import { customerMessageRouter } from "@/server/api/routers/customer-message-rou
 import { adminRouter } from "@/server/api/routers/admin-router";
 import { aiRouter } from "@/server/api/routers/ai-router";
 import { walletRouter } from "@/server/api/routers/wallet-router";
+import { categoryRouter } from "@/server/api/routers/category-router";
 
 /**
  * This is the primary router for your server.
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   user: userRouter,
   transaction: transactionRouter,
   wallet: walletRouter,
+  category: categoryRouter,
   customerMessage: customerMessageRouter,
   admin: adminRouter,
   ai: aiRouter,

@@ -86,7 +86,7 @@ const monthBounds = () => {
   return { start: toDateInput(start), end: toDateInput(end) };
 };
 
-const categoryVariant: Record<
+const typeVariant: Record<
   string,
   "green" | "yellow" | "blue" | "destructive" | "secondary"
 > = {
@@ -94,7 +94,7 @@ const categoryVariant: Record<
   EXPENSE: "destructive",
 };
 
-const categoryLabel: Record<string, string> = {
+const typeLabel: Record<string, string> = {
   INCOME: "Pemasukan",
   EXPENSE: "Pengeluaran",
 };
@@ -104,20 +104,20 @@ const TransactionData = () => {
   const [limit, setLimit] = useState(10);
   const [searchInput, setSearchInput] = useState("");
   const search = useDebounced(searchInput);
-  const [category, setCategory] = useState<"INCOME" | "EXPENSE" | "all">("all");
+  const [type, setType] = useState<"INCOME" | "EXPENSE" | "all">("all");
   const initial = monthBounds();
   const [startDate, setStartDate] = useState(initial.start);
   const [endDate, setEndDate] = useState(initial.end);
 
   useEffect(() => {
     setPage(1);
-  }, [search, category, startDate, endDate]);
+  }, [search, type, startDate, endDate]);
 
   const { data: list, isLoading } = api.transaction.findAllAdmin.useQuery({
     page,
     limit,
     search: search || undefined,
-    category: category === "all" ? undefined : category,
+    type: type === "all" ? undefined : type,
     start_date: startDate ? new Date(startDate) : undefined,
     end_date: endDate ? new Date(endDate) : undefined,
   });
@@ -143,17 +143,17 @@ const TransactionData = () => {
 
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Select
-              value={category}
+              value={type}
               onValueChange={(value) =>
-                setCategory(value as "INCOME" | "EXPENSE" | "all")
+                setType(value as "INCOME" | "EXPENSE" | "all")
               }
             >
               <SelectTrigger className="h-9 w-[160px] cursor-pointer bg-white text-sm">
-                <SelectValue placeholder="Semua Kategori" />
+                <SelectValue placeholder="Semua Tipe" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" className="cursor-pointer">
-                  Semua Kategori
+                  Semua Tipe
                 </SelectItem>
                 <SelectItem value="INCOME" className="cursor-pointer">
                   Pemasukan
@@ -193,7 +193,7 @@ const TransactionData = () => {
                   <TableHead>User</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Tanggal</TableHead>
-                  <TableHead>Kategori</TableHead>
+                  <TableHead>Tipe Transaksi</TableHead>
                   <TableHead>Keterangan</TableHead>
                   <TableHead className="text-right">Nominal</TableHead>
                 </TableRow>
@@ -225,12 +225,10 @@ const TransactionData = () => {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={
-                            categoryVariant[item.category] ?? "secondary"
-                          }
+                          variant={typeVariant[item.type] ?? "secondary"}
                           className="rounded-md text-[10px]"
                         >
-                          {categoryLabel[item.category] ?? item.category}
+                          {typeLabel[item.type] ?? item.type}
                         </Badge>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate text-dl-muted">
@@ -238,12 +236,12 @@ const TransactionData = () => {
                       </TableCell>
                       <TableCell
                         className={
-                          item.category === "INCOME"
+                          item.type === "INCOME"
                             ? "text-right font-medium text-dl-foreground"
                             : "text-right font-medium text-dl-error"
                         }
                       >
-                        {item.category === "INCOME" ? "+" : "-"}Rp{" "}
+                        {item.type === "INCOME" ? "+" : "-"}Rp{" "}
                         {formatStandardNumber(item.totalAmount)}
                       </TableCell>
                     </TableRow>
