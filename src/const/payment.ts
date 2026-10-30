@@ -2,6 +2,10 @@ import type { UserStatus } from "@prisma/client";
 
 export type PlanId = "pemula_monthly" | "pemula_yearly" | "jago_lifetime";
 
+export type PlanPrices = Record<PlanId, number> & {
+  jagoAfterPromo: number;
+};
+
 type Plan = {
   id: PlanId;
   name: string;

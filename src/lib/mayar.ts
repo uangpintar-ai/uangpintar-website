@@ -42,6 +42,7 @@ const headers = () => ({
 
 export const createMayarInvoice = async (input: {
   plan: PlanId;
+  amount: number;
   name: string;
   email: string;
   mobile: string;
@@ -66,7 +67,7 @@ export const createMayarInvoice = async (input: {
       items: [
         {
           quantity: 1,
-          rate: plan.amount,
+          rate: input.amount,
           description: plan.description,
         },
       ],

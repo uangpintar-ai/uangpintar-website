@@ -7,7 +7,7 @@ import { ArrowLeft, Check, Crown } from "lucide-react";
 import CheckoutForm from "@/components/module/checkout/CheckoutForm";
 import PaymentDialog from "@/components/module/checkout/PaymentDialog";
 import PricingCards from "@/components/module/pricing/PricingCards";
-import { PLANS, type PlanId } from "@/const/payment";
+import { PLANS, type PlanId, type PlanPrices } from "@/const/payment";
 import { toastSuccess } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ type Props = {
   activePlan: PlanId | null;
   name: string;
   email: string;
+  prices: PlanPrices;
 };
 
 const UpgradePlans = ({
@@ -25,6 +26,7 @@ const UpgradePlans = ({
   activePlan,
   name,
   email,
+  prices,
 }: Props) => {
   const router = useRouter();
   const { update } = useSession();
@@ -156,6 +158,7 @@ const UpgradePlans = ({
               <PricingCards
                 availablePlans={availablePlans}
                 selectedPlan={planId}
+                prices={prices}
                 showFree={false}
                 flush
                 onSelect={(id) => {
@@ -186,7 +189,7 @@ const UpgradePlans = ({
                       planId={plan.id}
                       planName={plan.name}
                       period={plan.period}
-                      amount={plan.amount}
+                      amount={prices[plan.id]}
                       name={name}
                       email={email}
                       onInvoiceLink={(nextLink, nextPaymentId) => {

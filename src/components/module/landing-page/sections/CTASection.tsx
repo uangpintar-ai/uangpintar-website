@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { PlanPrices } from "@/const/payment";
+import { formatCurrency } from "@/lib/utils";
 
-const CTASection = () => {
+type Props = {
+  prices: PlanPrices;
+};
+
+const CTASection = ({ prices }: Props) => {
   const router = useRouter();
 
   return (
@@ -15,10 +21,14 @@ const CTASection = () => {
         >
           Promo Founder
         </div>
-        <h2>Lifetime Rp249.000, hanya untuk 50 pengguna pertama.</h2>
+        <h2>
+          Lifetime {formatCurrency(prices.jago_lifetime)}, hanya untuk 50
+          pengguna pertama.
+        </h2>
         <p className="p">
-          Setelah 50 slot terisi, Paket Jago menjadi Rp299.000 per tahun dan
-          opsi lifetime ditutup. Bayar sekali sekarang, tanpa tagihan bulanan.
+          Setelah 50 slot terisi, Paket Jago menjadi{" "}
+          {formatCurrency(prices.jagoAfterPromo)} per tahun dan opsi lifetime
+          ditutup. Bayar sekali sekarang, tanpa tagihan bulanan.
         </p>
         <div className="slots">Sisa [XX] dari 50 slot</div>
         <div className="row">

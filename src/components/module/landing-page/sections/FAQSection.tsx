@@ -1,6 +1,12 @@
 import { ChevronDown } from "lucide-react";
+import type { PlanPrices } from "@/const/payment";
+import { formatCurrency } from "@/lib/utils";
 
-const faq: [string, string][] = [
+type Props = {
+  prices: PlanPrices;
+};
+
+const getFaq = (prices: PlanPrices): [string, string][] => [
   [
     "Apa itu Uang Pintar AI?",
     "Aplikasi pencatat keuangan pribadi. Kamu bisa mencatat pemasukan dan pengeluaran secara manual, atau lewat AI dengan mengucapkan atau mengetik transaksimu.",
@@ -19,7 +25,7 @@ const faq: [string, string][] = [
   ],
   [
     "Apa arti \u201clifetime\u201d di Paket Jago?",
-    "Kamu membayar sekali dan tidak ada tagihan bulanan. Aksesnya berlaku selama layanan Uang Pintar beroperasi. Harga lifetime hanya untuk 50 pengguna pertama; setelah itu Paket Jago Rp299.000 per tahun.",
+    `Kamu membayar sekali dan tidak ada tagihan bulanan. Aksesnya berlaku selama layanan Uang Pintar beroperasi. Harga lifetime hanya untuk 50 pengguna pertama; setelah itu Paket Jago ${formatCurrency(prices.jagoAfterPromo)} per tahun.`,
   ],
   [
     "Apakah data keuanganku aman?",
@@ -35,7 +41,9 @@ const faq: [string, string][] = [
   ],
 ];
 
-const FAQSection = () => {
+const FAQSection = ({ prices }: Props) => {
+  const faq = getFaq(prices);
+
   return (
     <section className="faq pad" id="faq">
       <div className="in">

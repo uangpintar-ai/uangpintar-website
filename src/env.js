@@ -14,6 +14,7 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    PLAN_PRICE_MODE: z.enum(["test", "live", "production"]).optional(),
     DATABASE_URL: z.string().url(),
     REDIS_URL: z.string().url(),
     RESEND: z.string(),
@@ -37,6 +38,7 @@ export const env = createEnv({
   runtimeEnv: {
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NODE_ENV: process.env.NODE_ENV,
+    PLAN_PRICE_MODE: process.env.PLAN_PRICE_MODE,
     DATABASE_URL: process.env.DATABASE_URL,
     REDIS_URL: process.env.REDIS_URL,
     RESEND: process.env.RESEND,

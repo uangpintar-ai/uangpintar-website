@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { PlanId } from "@/const/payment";
+import type { PlanId, PlanPrices } from "@/const/payment";
+import { formatCurrency } from "@/lib/utils";
 import "@/components/module/landing-page/landing.css";
 
 const allPlanIds: PlanId[] = [
@@ -126,6 +127,7 @@ const List = ({ items }: { items: [boolean, string][] }) => (
 type Props = {
   availablePlans?: PlanId[];
   selectedPlan?: PlanId | null;
+  prices: PlanPrices;
   onSelect: (planId: PlanId) => void;
   showFree?: boolean;
   flush?: boolean;
@@ -135,6 +137,7 @@ type Props = {
 const PricingCards = ({
   availablePlans = allPlanIds,
   selectedPlan,
+  prices,
   onSelect,
   showFree = true,
   flush = false,
@@ -151,6 +154,10 @@ const PricingCards = ({
   const isYearly = monthlyAvailable ? yearly : yearlyAvailable;
   const pemulaPlanId: PlanId = isYearly ? "pemula_yearly" : "pemula_monthly";
   const pemulaTitle = isYearly ? "Pemula Tahunan" : "Pemula Bulanan";
+  const monthlyAmount = prices.pemula_monthly;
+  const yearlyAmount = prices.pemula_yearly;
+  const jagoAmount = prices.jago_lifetime;
+  const jagoAfterPromoAmount = prices.jagoAfterPromo;
 
   return (
     <div className="up-landing pricing-cards">
@@ -202,13 +209,13 @@ const PricingCards = ({
               </div>
             )}
             <div className="price" style={{ marginTop: "16px" }}>
-              <b>{isYearly ? "Rp199.000" : "Rp20.000"}</b>
+              <b>{formatCurrency(isYearly ? yearlyAmount : monthlyAmount)}</b>
               <span className="unit">{isYearly ? "/tahun" : "/bulan"}</span>
             </div>
             <div className="note">
               {isYearly
-                ? "Ditagih Rp199.000 untuk 12 bulan"
-                : "Atau Rp199.000/tahun"}
+                ? `Ditagih ${formatCurrency(yearlyAmount)} untuk 12 bulan`
+                : `Atau ${formatCurrency(yearlyAmount)}/tahun`}
             </div>
             <p className="desc">
               Waktunya serius. Catat manual tanpa batas plus 300x catat
@@ -235,12 +242,12 @@ const PricingCards = ({
             <h3>Paket Jago</h3>
             <p className="sub">Bayar sekali. Uangmu terkendali.</p>
             <div className="price">
-              <b>Rp249.000</b>
+              <b>{formatCurrency(jagoAmount)}</b>
               <span className="unit">sekali bayar</span>
             </div>
             <div className="note">
-              Akses lifetime. Setelah promo: Rp299.000/tahun, tanpa opsi
-              lifetime.
+              Akses lifetime. Setelah promo:{" "}
+              {formatCurrency(jagoAfterPromoAmount)}/tahun, tanpa opsi lifetime.
             </div>
             <p className="desc">
               Untuk kamu yang mau uangnya benar-benar terkendali. Semua fitur

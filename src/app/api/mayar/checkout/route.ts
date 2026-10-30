@@ -11,6 +11,7 @@ import {
 } from "@/lib/verification";
 import { checkoutLeadSchema } from "@/schema/payment-schema";
 import { applyPlan } from "@/server/services/payment-service";
+import { getPlanPrice } from "@/server/services/plan-price";
 import { DEFAULT_WALLET_NAME } from "@/server/services/wallet-service";
 import { DEFAULT_CATEGORIES } from "@/server/services/category-service";
 
@@ -262,6 +263,7 @@ export const POST = async (request: Request) => {
   }
 
   const plan = PLANS[planId];
+  const amount = getPlanPrice(planId);
 
   if (skipPayment) {
     const payment = await db.$transaction(async (tx) => {
@@ -269,7 +271,7 @@ export const POST = async (request: Request) => {
         data: {
           userId: user.id,
           plan: plan.id,
-          amount: plan.amount,
+          amount,
           mobile,
           status: "PAID",
           paidAt: new Date(),
@@ -318,7 +320,7 @@ export const POST = async (request: Request) => {
     data: {
       userId: user.id,
       plan: plan.id,
-      amount: plan.amount,
+      amount,
       mobile,
       expiresAt,
       status: "PENDING",
@@ -328,6 +330,7 @@ export const POST = async (request: Request) => {
   try {
     const invoice = await createMayarInvoice({
       plan: plan.id,
+      amount,
       name: `${user.firstName} ${user.lastName}`.trim(),
       email: user.email,
       mobile,

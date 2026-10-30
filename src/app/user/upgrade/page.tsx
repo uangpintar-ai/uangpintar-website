@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/server/auth/auth-options";
 import { db } from "@/server/db";
 import { isPlanId, type PlanId } from "@/const/payment";
+import { getPlanPrices } from "@/server/services/plan-price";
 import UpgradePlans from "@/components/module/upgrade/UpgradePlans";
 
 type Props = {
@@ -73,6 +74,7 @@ const UpgradePage = async ({ searchParams }: Props) => {
       activePlan={active ? activePlan : null}
       name={`${user.firstName} ${user.lastName}`.trim()}
       email={user.email}
+      prices={getPlanPrices()}
     />
   );
 };

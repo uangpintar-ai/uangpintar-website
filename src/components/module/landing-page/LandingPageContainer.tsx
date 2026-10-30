@@ -6,8 +6,11 @@ import TestimonialsSection from "./sections/TestimonialsSection";
 import PricingSection from "./sections/PricingSection";
 import FAQSection from "./sections/FAQSection";
 import CTASection from "./sections/CTASection";
+import { getPlanPrices } from "@/server/services/plan-price";
 
 const LandingPageContainer = () => {
+  const prices = getPlanPrices();
+
   return (
     <>
       <HeroSection />
@@ -15,9 +18,9 @@ const LandingPageContainer = () => {
       <HowItWorksSection />
       <FeaturesSection />
       <TestimonialsSection />
-      <PricingSection />
-      <CTASection />
-      <FAQSection />
+      <PricingSection prices={prices} />
+      <CTASection prices={prices} />
+      <FAQSection prices={prices} />
     </>
   );
 };

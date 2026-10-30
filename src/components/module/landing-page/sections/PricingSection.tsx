@@ -3,40 +3,49 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PricingCards from "@/components/module/pricing/PricingCards";
-import type { PlanId } from "@/const/payment";
+import type { PlanId, PlanPrices } from "@/const/payment";
 
 const fmt = (value: number) => `Rp${value.toLocaleString("id-ID")}`;
 
-const costRows = [
-  {
-    key: "pm",
-    label: "Pemula bulanan",
-    sub: "Rp20.000 per bulan",
-    fn: (months: number) => 20000 * months,
-  },
-  {
-    key: "py",
-    label: "Pemula tahunan",
-    sub: "Rp199.000 per 12 bulan",
-    fn: (months: number) => 199000 * Math.ceil(months / 12),
-  },
-  {
-    key: "jl",
-    label: "Jago lifetime (promo)",
-    sub: "Rp249.000 sekali bayar",
-    fn: (_months: number) => 249000,
-  },
-  {
-    key: "jy",
-    label: "Jago setelah promo",
-    sub: "Rp299.000 per tahun",
-    fn: (months: number) => 299000 * Math.ceil(months / 12),
-  },
-];
+type Props = {
+  prices: PlanPrices;
+};
 
-const PricingSection = () => {
+const PricingSection = ({ prices }: Props) => {
   const router = useRouter();
   const [months, setMonths] = useState(12);
+
+  const monthlyAmount = prices.pemula_monthly;
+  const yearlyAmount = prices.pemula_yearly;
+  const jagoAmount = prices.jago_lifetime;
+  const jagoAfterPromoAmount = prices.jagoAfterPromo;
+
+  const costRows = [
+    {
+      key: "pm",
+      label: "Pemula bulanan",
+      sub: `${fmt(monthlyAmount)} per bulan`,
+      fn: (values: number) => monthlyAmount * values,
+    },
+    {
+      key: "py",
+      label: "Pemula tahunan",
+      sub: `${fmt(yearlyAmount)} per 12 bulan`,
+      fn: (values: number) => yearlyAmount * Math.ceil(values / 12),
+    },
+    {
+      key: "jl",
+      label: "Jago lifetime (promo)",
+      sub: `${fmt(jagoAmount)} sekali bayar`,
+      fn: (_values: number) => jagoAmount,
+    },
+    {
+      key: "jy",
+      label: "Jago setelah promo",
+      sub: `${fmt(jagoAfterPromoAmount)} per tahun`,
+      fn: (values: number) => jagoAfterPromoAmount * Math.ceil(values / 12),
+    },
+  ];
 
   const selectPlan = (planId: PlanId) => {
     router.push(`/checkout?plan=${planId}`);
@@ -59,7 +68,7 @@ const PricingSection = () => {
             </h2>
           </div>
 
-          <PricingCards reveal onSelect={selectPlan} />
+          <PricingCards reveal onSelect={selectPlan} prices={prices} />
 
           <div className="calc reveal">
             <h3>Berapa total biayanya kalau kamu pakai lama?</h3>
@@ -113,10 +122,11 @@ const PricingSection = () => {
               })}
             </div>
             <p className="cnote">
-              Asumsi hitungan: Pemula bulanan Rp20.000 per bulan. Pemula tahunan
-              Rp199.000 per 12 bulan, dibayar di muka. Jago lifetime Rp249.000
-              sekali bayar selama promo 50 slot, setelah itu Rp299.000 per
-              tahun. Harga dan promo bisa berubah.
+              Asumsi hitungan: Pemula bulanan {fmt(monthlyAmount)} per bulan.
+              Pemula tahunan {fmt(yearlyAmount)} per 12 bulan, dibayar di muka.
+              Jago lifetime {fmt(jagoAmount)} sekali bayar selama promo 50 slot,
+              setelah itu {fmt(jagoAfterPromoAmount)} per tahun. Harga dan promo
+              bisa berubah.
             </p>
           </div>
         </div>

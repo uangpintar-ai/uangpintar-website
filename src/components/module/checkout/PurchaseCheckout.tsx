@@ -23,7 +23,7 @@ import { UangPintarWhiteLogoNoBg } from "@/lib/images";
 import { cn, formatCurrency } from "@/lib/utils";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { checkoutLeadSchema } from "@/schema/payment-schema";
-import { PLANS, type PlanId } from "@/const/payment";
+import { PLANS, type PlanId, type PlanPrices } from "@/const/payment";
 import {
   DEFAULT_PAYMENT_METHOD,
   PAYMENT_CHANNELS,
@@ -57,9 +57,10 @@ const planBilling: Record<PlanId, string> = {
 
 type Props = {
   initialPlan: PlanId;
+  prices: PlanPrices;
 };
 
-const PurchaseCheckout = ({ initialPlan }: Props) => {
+const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [planId, setPlanId] = useState<PlanId>(initialPlan);
@@ -301,7 +302,8 @@ const PurchaseCheckout = ({ initialPlan }: Props) => {
                   {paymentPlan.name}
                 </p>
                 <p className="text-xs text-dl-muted">
-                  {formatCurrency(paymentPlan.amount)} · {paymentMethodLabel}
+                  {formatCurrency(prices[payment.planId])} ·{" "}
+                  {paymentMethodLabel}
                 </p>
               </div>
               <button
@@ -494,7 +496,7 @@ const PurchaseCheckout = ({ initialPlan }: Props) => {
                       </span>
                       <span className="text-right">
                         <span className="block text-sm font-bold text-white">
-                          {formatCurrency(option.amount)}
+                          {formatCurrency(prices[option.id])}
                         </span>
                         <span className="block text-[11px] text-white/50">
                           {planBilling[option.id]}
