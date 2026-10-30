@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth/auth-options";
 import { db } from "@/server/db";
 import { isPlanId, PLANS } from "@/const/payment";
+import { isMayarPaymentMethod } from "@/const/mayar-payment";
 import { createMayarInvoice } from "@/lib/mayar";
 import {
   createPasswordSetupLink,
@@ -19,6 +20,7 @@ type CheckoutBody = {
   email?: string;
   first_name?: string;
   last_name?: string;
+  payment_method?: string;
   skip_payment?: boolean;
 };
 
@@ -32,6 +34,15 @@ export const POST = async (request: Request) => {
 
   if (!isPlanId(planId)) {
     return NextResponse.json({ message: "Paket tidak valid" }, { status: 400 });
+  }
+
+  const paymentMethod = body?.payment_method;
+
+  if (paymentMethod !== undefined && !isMayarPaymentMethod(paymentMethod)) {
+    return NextResponse.json(
+      { message: "Metode pembayaran tidak valid" },
+      { status: 400 },
+    );
   }
 
   const skipPayment = body?.skip_payment === true;
@@ -322,6 +333,7 @@ export const POST = async (request: Request) => {
       mobile,
       orderId: payment.id,
       expiresAt,
+      paymentMethod,
     });
 
     await db.payment.update({
@@ -333,7 +345,11 @@ export const POST = async (request: Request) => {
       },
     });
 
-    return NextResponse.json({ link: invoice.link, paymentId: payment.id });
+    return NextResponse.json({
+      link: invoice.link,
+      paymentId: payment.id,
+      paymentDetail: invoice.paymentDetail,
+    });
   } catch (error) {
     await db.payment.update({
       where: { id: payment.id },

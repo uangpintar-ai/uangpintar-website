@@ -2,8 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getSession } from "next-auth/react";
-import PurchaseModal from "@/components/module/checkout/PurchaseModal";
 import PricingCards from "@/components/module/pricing/PricingCards";
 import type { PlanId } from "@/const/payment";
 
@@ -39,17 +37,9 @@ const costRows = [
 const PricingSection = () => {
   const router = useRouter();
   const [months, setMonths] = useState(12);
-  const [checkoutPlan, setCheckoutPlan] = useState<PlanId | null>(null);
 
-  const selectPlan = async (planId: PlanId) => {
-    const session = await getSession().catch(() => null);
-
-    if (session) {
-      router.push(`/user/upgrade?plan=${planId}`);
-      return;
-    }
-
-    setCheckoutPlan(planId);
+  const selectPlan = (planId: PlanId) => {
+    router.push(`/checkout?plan=${planId}`);
   };
 
   const values = costRows.map((row) => row.fn(months));
@@ -69,7 +59,7 @@ const PricingSection = () => {
             </h2>
           </div>
 
-          <PricingCards reveal onSelect={(planId) => void selectPlan(planId)} />
+          <PricingCards reveal onSelect={selectPlan} />
 
           <div className="calc reveal">
             <h3>Berapa total biayanya kalau kamu pakai lama?</h3>
@@ -131,10 +121,6 @@ const PricingSection = () => {
           </div>
         </div>
       </section>
-      <PurchaseModal
-        planId={checkoutPlan}
-        onClose={() => setCheckoutPlan(null)}
-      />
     </>
   );
 };

@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { env } from "@/env";
 import { PLANS, type PlanId } from "@/const/payment";
+import {
+  parseMayarPaymentDetail,
+  type MayarPaymentMethod,
+} from "@/const/mayar-payment";
 import { timingSafeEqual } from "crypto";
 
 const createInvoiceResponse = z.object({
@@ -11,6 +15,7 @@ const createInvoiceResponse = z.object({
     id: z.string(),
     transactionId: z.string(),
     link: z.string().url(),
+    paymentDetail: z.unknown().optional(),
   }),
 });
 
@@ -42,6 +47,7 @@ export const createMayarInvoice = async (input: {
   mobile: string;
   orderId: string;
   expiresAt?: Date;
+  paymentMethod?: MayarPaymentMethod;
 }) => {
   const plan = PLANS[input.plan];
 
@@ -53,6 +59,7 @@ export const createMayarInvoice = async (input: {
       email: input.email,
       mobile: input.mobile,
       description: plan.description,
+      ...(input.paymentMethod ? { paymentMethod: input.paymentMethod } : {}),
       expiredAt: (
         input.expiresAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000)
       ).toISOString(),
@@ -81,7 +88,12 @@ export const createMayarInvoice = async (input: {
     throw new Error(message ?? "Gagal membuat invoice Mayar");
   }
 
-  return parsed.data.data;
+  const data = parsed.data.data;
+
+  return {
+    ...data,
+    paymentDetail: parseMayarPaymentDetail(data.paymentDetail),
+  };
 };
 
 export const getMayarInvoice = async (invoiceId: string) => {
