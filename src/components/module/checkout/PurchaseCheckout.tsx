@@ -44,6 +44,7 @@ type PaymentState = {
   detail: MayarPaymentDetail | null;
   link: string;
   method: MayarPaymentMethod;
+  paymentId: string | null;
   planId: PlanId;
 };
 
@@ -71,6 +72,14 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [checkedEmail, setCheckedEmail] = useState<string | null>(null);
+  const [emailNote, setEmailNote] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
   const [error, setError] = useState("");
 
   const plan = PLANS[planId];
@@ -130,34 +139,72 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
     return () => window.removeEventListener("message", configureMayar);
   }, [payment]);
 
-  const submitData = form.handleSubmit(async (values) => {
-    setError("");
-    setSubmitting(true);
+  const checkEmail = async (rawEmail?: string) => {
+    const email = (rawEmail ?? form.getValues("email")).trim().toLowerCase();
+
+    if (!email) {
+      form.setError("email", { message: "Email harus diisi" });
+      setEmailNote({ ok: false, message: "Email harus diisi." });
+      return false;
+    }
+
+    setEmailChecking(true);
+    setEmailNote(null);
 
     try {
-      const checkResponse = await fetch("/api/checkout/check-email", {
+      const response = await fetch("/api/checkout/check-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: values.email }),
+        body: JSON.stringify({ email }),
       });
 
-      const checkPayload = (await checkResponse.json().catch(() => null)) as {
+      const payload = (await response.json().catch(() => null)) as {
         emailValid?: boolean;
         registered?: boolean;
         message?: string;
       } | null;
 
-      if (!checkResponse.ok || !checkPayload) {
-        throw new Error(checkPayload?.message ?? "Gagal memeriksa email.");
+      if (!response.ok || !payload) {
+        throw new Error(payload?.message ?? "Gagal memeriksa email.");
       }
 
-      if (!checkPayload.emailValid || checkPayload.registered) {
-        form.setError("email", {
-          message: checkPayload.message ?? "Email tidak dapat digunakan.",
-        });
-        return;
+      if (!payload.emailValid || payload.registered) {
+        const message = payload.message ?? "Email tidak dapat digunakan.";
+        form.setError("email", { message });
+        setCheckedEmail(null);
+        setEmailNote({ ok: false, message });
+        return false;
       }
 
+      form.clearErrors("email");
+      setCheckedEmail(email);
+      setEmailNote({ ok: true, message: "Email valid dan bisa digunakan." });
+      return true;
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Gagal memeriksa email.";
+      form.setError("email", { message });
+      setCheckedEmail(null);
+      setEmailNote({ ok: false, message });
+      return false;
+    } finally {
+      setEmailChecking(false);
+    }
+  };
+
+  const submitData = form.handleSubmit(async (values) => {
+    setError("");
+
+    const email = values.email.trim().toLowerCase();
+
+    if (checkedEmail !== email) {
+      const valid = await checkEmail(email);
+      if (!valid) return;
+    }
+
+    setSubmitting(true);
+
+    try {
       const response = await fetch("/api/mayar/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -175,6 +222,7 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
         link?: string;
         message?: string;
         paymentDetail?: MayarPaymentDetail | null;
+        paymentId?: string;
       } | null;
 
       if (!response.ok) {
@@ -190,9 +238,11 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
         link: payload.link,
         detail: payload.paymentDetail ?? null,
         method: paymentMethod,
+        paymentId: payload.paymentId ?? null,
         planId: plan.id,
       });
       setEditing(false);
+      setStatusNote("");
     } catch (caught) {
       const raw =
         caught instanceof Error
@@ -269,6 +319,87 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
       toastError("Gagal", "Nomor virtual account tidak bisa disalin.");
     }
   };
+
+  const checkStatus = async () => {
+    if (!payment?.paymentId) {
+      setStatusNote(
+        "ID pembayaran tidak tersedia. Silakan buat pembayaran baru.",
+      );
+      return;
+    }
+
+    setCheckingStatus(true);
+    setStatusNote("");
+
+    try {
+      const response = await fetch(
+        `/api/checkout/status?paymentId=${encodeURIComponent(
+          payment.paymentId,
+        )}`,
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        message?: string;
+        status?: string;
+      } | null;
+
+      if (!response.ok || !payload) {
+        throw new Error(
+          payload?.message ?? "Gagal mengecek status pembayaran.",
+        );
+      }
+
+      if (payload.status === "PAID") {
+        router.push(
+          `/checkout/success?paymentId=${encodeURIComponent(payment.paymentId)}`,
+        );
+        return;
+      }
+
+      if (payload.status === "EXPIRED" || payload.status === "FAILED") {
+        setStatusNote(
+          "Pembayaran sudah kedaluwarsa atau gagal. Silakan buat pembayaran baru.",
+        );
+        return;
+      }
+
+      setStatusNote(
+        "Pembayaran belum diterima. Tunggu sebentar lalu cek lagi.",
+      );
+    } catch (caught) {
+      const message =
+        caught instanceof Error
+          ? caught.message
+          : "Gagal mengecek status pembayaran.";
+      setStatusNote(message);
+      toastError("Gagal", message);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const paymentId = payment?.paymentId;
+
+  useEffect(() => {
+    if (!paymentId) return;
+
+    const interval = setInterval(() => {
+      void fetch(
+        `/api/checkout/status?paymentId=${encodeURIComponent(paymentId)}`,
+      )
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: { status?: string } | null) => {
+          if (payload?.status !== "PAID") return;
+
+          clearInterval(interval);
+          router.push(
+            `/checkout/success?paymentId=${encodeURIComponent(paymentId)}`,
+          );
+        })
+        .catch(() => undefined);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [paymentId, router]);
 
   return (
     <div className="w-full max-w-md">
@@ -423,6 +554,31 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
                 </>
               )}
 
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  void checkStatus();
+                }}
+                disabled={checkingStatus}
+                className="h-11 w-full rounded-xl border-dl-border text-dl-foreground hover:bg-dl-cream"
+              >
+                {checkingStatus ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Memeriksa...
+                  </>
+                ) : (
+                  "Cek Status Pembayaran"
+                )}
+              </Button>
+
+              {statusNote && (
+                <p className="text-center text-xs leading-relaxed text-dl-muted">
+                  {statusNote}
+                </p>
+              )}
+
               <p className="text-xs leading-relaxed text-dl-muted">
                 Paket aktif otomatis setelah pembayaran berhasil. Kamu bisa
                 mengganti metode atau paket sebelum membayar.
@@ -514,22 +670,58 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-white">Email</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dl-muted" />
-                      <Input
-                        type="email"
-                        placeholder="Masukkan email"
-                        autoComplete="email"
-                        className="bg-white pl-9"
-                        {...field}
-                        onChange={(event) => {
-                          field.onChange(event);
-                          form.clearErrors("email");
-                        }}
-                      />
-                    </div>
-                  </FormControl>
+                  <div className="flex items-start gap-2">
+                    <FormControl>
+                      <div className="relative flex-1">
+                        <Mail className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-dl-muted" />
+                        <Input
+                          type="email"
+                          placeholder="Masukkan email"
+                          autoComplete="email"
+                          className="bg-white pl-9"
+                          {...field}
+                          onChange={(event) => {
+                            field.onChange(event);
+                            form.clearErrors("email");
+                            setCheckedEmail(null);
+                            setEmailNote(null);
+                          }}
+                        />
+                      </div>
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label={emailNote?.ok ? "Email valid" : "Cek email"}
+                      onClick={() => {
+                        void checkEmail();
+                      }}
+                      disabled={emailChecking || submitting}
+                      className={cn(
+                        "shrink-0 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white",
+                        emailNote?.ok &&
+                          "border-green-400/60 text-green-300 hover:text-green-300",
+                      )}
+                    >
+                      {emailChecking ? (
+                        <Loader2 className="animate-spin" />
+                      ) : emailNote?.ok ? (
+                        <Check />
+                      ) : (
+                        "Cek"
+                      )}
+                    </Button>
+                  </div>
+                  {emailNote && (
+                    <p
+                      className={cn(
+                        "text-xs leading-relaxed",
+                        emailNote.ok ? "text-green-300" : "text-red-300",
+                      )}
+                    >
+                      {emailNote.message}
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -651,7 +843,7 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
 
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || emailChecking}
               className="w-full bg-gradient-to-r from-dl-gradient-2 to-dl-primary text-white shadow-lg shadow-dl-primary/25 transition-all duration-300 hover:brightness-110 hover:shadow-dl-primary/40"
             >
               {submitting ? (

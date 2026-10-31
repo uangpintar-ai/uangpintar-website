@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -50,12 +51,22 @@ const ChangePasswordForm = ({ code, user_id }: Props) => {
   });
 
   const updatePassword = api.user.changePasswordVerify.useMutation({
-    onSuccess: () => {
-      toastSuccess(
-        "Kata Sandi Diubah!",
-        "Silakan masuk dengan kata sandi baru Anda",
-      );
-      router.push("/login");
+    onSuccess: async (data, variables) => {
+      const res = await signIn("credentials", {
+        email: data.email,
+        password: variables.new_password,
+        redirect: false,
+      });
+      if (res?.error) {
+        toastSuccess(
+          "Kata Sandi Diubah!",
+          "Silakan masuk dengan kata sandi baru Anda",
+        );
+        router.push("/login");
+        return;
+      }
+      toastSuccess("Kata Sandi Diubah!", "Selamat datang");
+      router.push("/user/dashboard");
     },
     onError: (error) => {
       toastError("Gagal!", error.message);

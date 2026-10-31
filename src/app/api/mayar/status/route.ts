@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth/auth-options";
 import { db } from "@/server/db";
+import { syncPaymentFromMayar } from "@/server/services/payment-service";
 
 export const GET = async (request: Request) => {
   const paymentId = new URL(request.url).searchParams.get("paymentId");
@@ -32,5 +33,10 @@ export const GET = async (request: Request) => {
     );
   }
 
-  return NextResponse.json({ status: payment.status });
+  const status =
+    payment.status === "PENDING"
+      ? ((await syncPaymentFromMayar(paymentId)) ?? payment.status)
+      : payment.status;
+
+  return NextResponse.json({ status });
 };

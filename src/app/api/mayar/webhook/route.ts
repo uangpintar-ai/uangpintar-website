@@ -3,46 +3,10 @@ import { z } from "zod";
 import { db } from "@/server/db";
 import { isPlanId } from "@/const/payment";
 import { getMayarInvoice, isValidMayarWebhookToken } from "@/lib/mayar";
-import { sendPasswordSetupEmail } from "@/lib/verification";
-import { applyPlan } from "@/server/services/payment-service";
-
-const sendSetupEmailIfNeeded = async (paymentId: string) => {
-  const payment = await db.payment.findUnique({
-    where: { id: paymentId },
-    select: {
-      status: true,
-      setupEmailSentAt: true,
-      userId: true,
-      user: { select: { email: true, password: true } },
-    },
-  });
-
-  if (!payment || payment.status !== "PAID" || payment.setupEmailSentAt) {
-    return;
-  }
-
-  if (payment.user.password) return;
-
-  const claimed = await db.payment.updateMany({
-    where: { id: paymentId, setupEmailSentAt: null },
-    data: { setupEmailSentAt: new Date() },
-  });
-
-  if (claimed.count === 0) return;
-
-  try {
-    await sendPasswordSetupEmail({
-      email: payment.user.email,
-      userId: payment.userId,
-    });
-  } catch (error) {
-    await db.payment.update({
-      where: { id: paymentId },
-      data: { setupEmailSentAt: null },
-    });
-    throw error;
-  }
-};
+import {
+  applyPlan,
+  sendSetupEmailIfNeeded,
+} from "@/server/services/payment-service";
 
 const webhookSchema = z.object({
   event: z.string(),

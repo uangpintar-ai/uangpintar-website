@@ -157,11 +157,12 @@ export const userRouter = createTRPCRouter({
         verificationKey("change_password", input.user_id),
       );
       const hash = await bcrypt.hash(input.new_password, 10);
-      await ctx.db.user.update({
+      const user = await ctx.db.user.update({
         where: { id: input.user_id },
         data: { password: hash },
+        select: { email: true },
       });
-      return { success: true };
+      return { success: true, email: user.email };
     }),
 
   resendRegisterCode: publicProcedure
