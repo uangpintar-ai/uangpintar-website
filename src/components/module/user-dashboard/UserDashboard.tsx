@@ -75,6 +75,7 @@ import TransactionActions from "./TransactionActions";
 
 const FILTER_MODES = [
   { value: "day", label: "Hari" },
+  { value: "week", label: "Minggu" },
   { value: "month", label: "Bulan" },
   { value: "year", label: "Tahun" },
 ] as const;
@@ -111,6 +112,40 @@ const wibStartOfYear = (year: number) =>
 const wibEndOfYear = (year: number) =>
   new Date(Date.UTC(year + 1, 0, 1) - 1 - WIB_OFFSET_MS);
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Minggu 00:00 s/d Sabtu 23:59:59.999 WIB.
+const wibWeekRange = (date: Date) => {
+  const wib = toWibDate(date);
+  const offset = -wib.getUTCDay();
+  const sundayUtc = Date.UTC(
+    wib.getUTCFullYear(),
+    wib.getUTCMonth(),
+    wib.getUTCDate() + offset,
+  );
+  return {
+    start: new Date(sundayUtc - WIB_OFFSET_MS),
+    end: new Date(sundayUtc + 7 * DAY_MS - 1 - WIB_OFFSET_MS),
+  };
+};
+
+const wibWeeksInMonth = (year: number, month: number) => {
+  const weeks: { start: Date; end: Date }[] = [];
+  const monthEnd = new Date(Date.UTC(year, month + 1, 1) - 1 - WIB_OFFSET_MS);
+  let cursor = wibWeekRange(
+    new Date(Date.UTC(year, month, 1) - WIB_OFFSET_MS),
+  ).start;
+  while (cursor.getTime() <= monthEnd.getTime()) {
+    const range = wibWeekRange(cursor);
+    weeks.push(range);
+    cursor = new Date(range.end.getTime() + 1);
+  }
+  return weeks;
+};
+
+const weekLabel = ({ start, end }: { start: Date; end: Date }) =>
+  `${formatDate(start.toISOString())} - ${formatDate(end.toISOString())}`;
+
 const NO_CACHE = {
   staleTime: 0,
   gcTime: 0,
@@ -134,6 +169,8 @@ type DateFilterContentProps = {
   onMonthChange: (sel: { year: number; month: number }) => void;
   yearSel: number | undefined;
   onYearChange: (year: number | undefined) => void;
+  weekSel: Date | undefined;
+  onWeekChange: (date: Date) => void;
   onApply: () => void;
   onReset: () => void;
 };
@@ -147,6 +184,8 @@ const DateFilterContent = ({
   onMonthChange,
   yearSel,
   onYearChange,
+  weekSel,
+  onWeekChange,
   onApply,
   onReset,
 }: DateFilterContentProps) => {
@@ -154,12 +193,35 @@ const DateFilterContent = ({
   const [draftRange, setDraftRange] = useState(range);
   const [draftMonth, setDraftMonth] = useState(monthSel);
   const [draftYear, setDraftYear] = useState(yearSel);
+  const [draftWeek, setDraftWeek] = useState<Date | undefined>(
+    weekSel ?? wibWeekRange(new Date()).start,
+  );
+
+  const draftWeeks = draftMonth
+    ? wibWeeksInMonth(draftMonth.year, draftMonth.month)
+    : [];
+  const selectedWeekStart = draftWeek
+    ? wibWeekRange(draftWeek).start.getTime()
+    : null;
+
+  const changeMonth = (next: { year: number; month: number }) => {
+    setDraftMonth(next);
+    if (draftMode === "week") {
+      setDraftWeek(wibWeeksInMonth(next.year, next.month)[0]?.start);
+    }
+  };
 
   const apply = () => {
     onFilterModeChange(draftMode);
     onRangeChange(draftRange);
     if (draftMonth) onMonthChange(draftMonth);
     onYearChange(draftYear ?? CURRENT_YEAR);
+    if (draftMode === "week") {
+      const selected = draftWeeks.find(
+        (week) => week.start.getTime() === selectedWeekStart,
+      );
+      onWeekChange(selected?.start ?? draftWeeks[0]?.start ?? new Date());
+    }
     onApply();
   };
 
@@ -170,7 +232,21 @@ const DateFilterContent = ({
           <button
             key={mode.value}
             type="button"
-            onClick={() => setDraftMode(mode.value)}
+            onClick={() => {
+              setDraftMode(mode.value);
+              if (mode.value === "week" && draftMonth) {
+                const weeks = wibWeeksInMonth(
+                  draftMonth.year,
+                  draftMonth.month,
+                );
+                const current = draftWeek
+                  ? wibWeekRange(draftWeek).start.getTime()
+                  : null;
+                if (!weeks.some((week) => week.start.getTime() === current)) {
+                  setDraftWeek(weeks[0]?.start);
+                }
+              }
+            }}
             className={cn(
               "flex-1 cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
               draftMode === mode.value
@@ -192,12 +268,12 @@ const DateFilterContent = ({
           />
         </div>
       )}
-      {draftMode === "month" && (
+      {(draftMode === "month" || draftMode === "week") && (
         <div className="space-y-2 p-3">
           <Select
             value={String(draftMonth?.month ?? 0)}
             onValueChange={(v) =>
-              setDraftMonth({
+              changeMonth({
                 year: draftMonth?.year ?? CURRENT_YEAR,
                 month: Number(v),
               })
@@ -221,7 +297,7 @@ const DateFilterContent = ({
           <Select
             value={String(draftMonth?.year ?? CURRENT_YEAR)}
             onValueChange={(v) =>
-              setDraftMonth({
+              changeMonth({
                 year: Number(v),
                 month: draftMonth?.month ?? 0,
               })
@@ -242,6 +318,31 @@ const DateFilterContent = ({
               ))}
             </SelectContent>
           </Select>
+          {draftMode === "week" && (
+            <div className="max-h-72 space-y-1 overflow-y-auto pr-1 pt-1">
+              {draftWeeks.map((week, index) => {
+                const active = week.start.getTime() === selectedWeekStart;
+                return (
+                  <button
+                    key={week.start.toISOString()}
+                    type="button"
+                    onClick={() => setDraftWeek(week.start)}
+                    className={cn(
+                      "flex w-full cursor-pointer flex-col items-start rounded-md border px-3 py-2 text-left text-xs transition-colors",
+                      active
+                        ? "border-dl-primary bg-dl-primary/5 text-dl-primary"
+                        : "border-dl-border bg-white text-dl-foreground hover:border-dl-primary/40",
+                    )}
+                  >
+                    <span className="font-medium">Minggu {index + 1}</span>
+                    <span className="text-[11px] text-dl-muted">
+                      {weekLabel(week)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       {draftMode === "year" && (
@@ -294,6 +395,7 @@ const UserDashboard = () => {
   const [range, setRange] = useState<DateRange | undefined>(undefined);
   const [monthSel, setMonthSel] = useState(CURRENT_MONTH);
   const [yearSel, setYearSel] = useState<number | undefined>(undefined);
+  const [weekSel, setWeekSel] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [tab, setTab] = useState<"transaksi" | "kategori">("transaksi");
@@ -344,30 +446,34 @@ const UserDashboard = () => {
 
   const currentWib = toWibDate();
   const startDate =
-    filterMode === "month" && monthSel
-      ? wibStartOfMonth(monthSel.year, monthSel.month)
-      : filterMode === "year" && yearSel
-        ? wibStartOfYear(yearSel)
-        : range?.from
-          ? range.from
-          : wibStartOfMonth(
-              currentWib.getUTCFullYear(),
-              currentWib.getUTCMonth(),
-            );
-
-  const effectiveEndDate =
-    filterMode === "month" && monthSel
-      ? wibEndOfMonth(monthSel.year, monthSel.month)
-      : filterMode === "year" && yearSel
-        ? wibEndOfYear(yearSel)
-        : range?.to
-          ? endDate
+    filterMode === "week"
+      ? wibWeekRange(weekSel ?? new Date()).start
+      : filterMode === "month" && monthSel
+        ? wibStartOfMonth(monthSel.year, monthSel.month)
+        : filterMode === "year" && yearSel
+          ? wibStartOfYear(yearSel)
           : range?.from
-            ? new Date(range.from).setHours(23, 59, 59, 999)
-            : wibEndOfMonth(
+            ? range.from
+            : wibStartOfMonth(
                 currentWib.getUTCFullYear(),
                 currentWib.getUTCMonth(),
               );
+
+  const effectiveEndDate =
+    filterMode === "week"
+      ? wibWeekRange(weekSel ?? new Date()).end
+      : filterMode === "month" && monthSel
+        ? wibEndOfMonth(monthSel.year, monthSel.month)
+        : filterMode === "year" && yearSel
+          ? wibEndOfYear(yearSel)
+          : range?.to
+            ? endDate
+            : range?.from
+              ? new Date(range.from).setHours(23, 59, 59, 999)
+              : wibEndOfMonth(
+                  currentWib.getUTCFullYear(),
+                  currentWib.getUTCMonth(),
+                );
 
   const categoryFilterKey = [
     categoryId ?? "",
@@ -453,20 +559,23 @@ const UserDashboard = () => {
         : "Pilih rentang tanggal";
 
   const filterLabel =
-    filterMode === "month"
-      ? monthSel
-        ? `${MONTHS[monthSel.month]} ${monthSel.year}`
-        : "Pilih bulan"
-      : filterMode === "year"
-        ? yearSel
-          ? String(yearSel)
-          : "Pilih tahun"
-        : rangeLabel;
+    filterMode === "week"
+      ? weekLabel(wibWeekRange(weekSel ?? new Date()))
+      : filterMode === "month"
+        ? monthSel
+          ? `${MONTHS[monthSel.month]} ${monthSel.year}`
+          : "Pilih bulan"
+        : filterMode === "year"
+          ? yearSel
+            ? String(yearSel)
+            : "Pilih tahun"
+          : rangeLabel;
 
   const resetFilter = () => {
     setRange(undefined);
     setMonthSel(CURRENT_MONTH);
     setYearSel(undefined);
+    setWeekSel(undefined);
     setWalletIds([]);
     setCalendarOpen(false);
     setSheetOpen(false);
@@ -695,6 +804,11 @@ const UserDashboard = () => {
                         setYearSel(year);
                         setPage(1);
                       }}
+                      weekSel={weekSel}
+                      onWeekChange={(date) => {
+                        setWeekSel(date);
+                        setPage(1);
+                      }}
                       onApply={() => setCalendarOpen(false)}
                       onReset={resetFilter}
                     />
@@ -740,6 +854,11 @@ const UserDashboard = () => {
                     yearSel={yearSel}
                     onYearChange={(year) => {
                       setYearSel(year);
+                      setPage(1);
+                    }}
+                    weekSel={weekSel}
+                    onWeekChange={(date) => {
+                      setWeekSel(date);
                       setPage(1);
                     }}
                     onApply={() => setSheetOpen(false)}
