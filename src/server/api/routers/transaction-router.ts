@@ -14,6 +14,7 @@ import {
   deleteTransaction,
   updateTransaction,
 } from "@/server/services/transaction-service";
+import { WIB_OFFSET_MS } from "@/lib/utils";
 
 export const transactionRouter = createTRPCRouter({
   findAll: protectedProcedure
@@ -297,12 +298,13 @@ export const transactionRouter = createTRPCRouter({
       });
       const map = new Map<string, number>();
       for (const t of transactions) {
-        const mm = String(t.trxDate.getMonth() + 1).padStart(2, "0");
-        const dd = String(t.trxDate.getDate()).padStart(2, "0");
+        const wib = new Date(t.trxDate.getTime() + WIB_OFFSET_MS);
+        const mm = String(wib.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(wib.getUTCDate()).padStart(2, "0");
         const label =
           input.group_by === "month"
-            ? `${t.trxDate.getFullYear()}-${mm}`
-            : `${t.trxDate.getFullYear()}-${mm}-${dd}`;
+            ? `${wib.getUTCFullYear()}-${mm}`
+            : `${wib.getUTCFullYear()}-${mm}-${dd}`;
         map.set(label, (map.get(label) ?? 0) + t.totalAmount);
       }
       return Array.from(map, ([label, revenue]) => ({ label, revenue }));

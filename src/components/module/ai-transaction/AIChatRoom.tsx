@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -15,6 +15,7 @@ import {
   MicOff,
   Plus,
   Save,
+  ScanText,
   Send,
   Sparkles,
   Trash2,
@@ -33,6 +34,7 @@ import {
   PiReceipt,
 } from "react-icons/pi";
 import { TransactionCategoryIcon } from "@/const/general/transaction-category-icons";
+import { hasOcrAccess } from "@/const/payment";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +63,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateWithTime,
+  toWibDate,
 } from "@/lib/utils";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { TAIResponse } from "@/server/api/types/ai-type";
@@ -113,11 +116,17 @@ const toDateInput = (d: Date) => {
 const toTimeInput = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
+const toWibDateInput = (d: Date) =>
+  `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+
+const toWibTimeInput = (d: Date) =>
+  `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+
 const initialDraft = (): TransactionDraft => {
-  const now = new Date();
+  const now = toWibDate();
   return {
-    trxDate: toDateInput(now),
-    trxTime: toTimeInput(now),
+    trxDate: toWibDateInput(now),
+    trxTime: toWibTimeInput(now),
     details: [{ name: "", amount: "1" }],
   };
 };
@@ -128,7 +137,7 @@ const MAX_VOICE_COST = (MAX_VOICE_SECONDS / 3600) * 0.22;
 
 const draftDate = (data: Partial<TAIResponse>): Date | null => {
   if (!data.trxDate) return null;
-  const date = new Date(`${data.trxDate}T${data.trxTime ?? "00:00"}`);
+  const date = new Date(`${data.trxDate}T${data.trxTime ?? "00:00"}:00+07:00`);
   return isNaN(date.getTime()) ? null : date;
 };
 
@@ -728,6 +737,7 @@ const AIChatRoom = () => {
   const { data: wallets } = api.wallet.findAll.useQuery();
   const { data: categories } = api.category.findAll.useQuery();
   const isFreeTier = session?.user?.status === "GRATIS";
+  const canUseOcr = hasOcrAccess(session?.user?.status);
   const [walletId, setWalletId] = useState("");
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
@@ -744,6 +754,7 @@ const AIChatRoom = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [usedVoiceSeconds, setUsedVoiceSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -753,8 +764,8 @@ const AIChatRoom = () => {
   const cancelRecordingRef = useRef(false);
 
   const pushMessage = (message: Omit<Message, "id">) => {
-    idRef.current += 1;
-    setMessages((prev) => [...prev, { ...message, id: idRef.current }]);
+    const id = ++idRef.current;
+    setMessages((prev) => [...prev, { ...message, id }]);
   };
 
   const getOrCreateSession = api.ai.getOrCreateSession.useMutation({
@@ -783,12 +794,23 @@ const AIChatRoom = () => {
       if (draft.walletId) setWalletId(draft.walletId);
       idRef.current = lastId;
       setMessages(loaded);
-      setSessionCost(session.details.reduce((sum, d) => sum + d.cost, 0));
+      const ocrCost = session.transcriptions.reduce(
+        (sum, t) => sum + (t.seconds === 0 ? t.cost : 0),
+        0,
+      );
+      setSessionCost(
+        session.details.reduce((sum, d) => sum + d.cost, 0) + ocrCost,
+      );
       const usedVoiceSeconds = session.transcriptions.reduce(
         (sum, t) => sum + t.seconds,
         0,
       );
-      setVoiceCost(session.transcriptions.reduce((sum, t) => sum + t.cost, 0));
+      setVoiceCost(
+        session.transcriptions.reduce(
+          (sum, t) => sum + (t.seconds > 0 ? t.cost : 0),
+          0,
+        ),
+      );
       voiceSecondsRef.current = usedVoiceSeconds;
       setUsedVoiceSeconds(usedVoiceSeconds);
       setDraftTick((t) => t + 1);
@@ -856,6 +878,78 @@ const AIChatRoom = () => {
       toastError("Gagal!", error.message);
     },
   });
+
+  const ocrImage = api.ai.ocrImage.useMutation({
+    onSuccess: (result) => {
+      setSessionCost((c) => c + (result.usage?.cost ?? 0));
+      mergeResponse(aiResponseRef.current, result.data);
+      if (result.data.walletId) setWalletId(result.data.walletId);
+      pushMessage({ role: "user", content: "📷 Foto transaksi" });
+      pushMessage({
+        role: "ai",
+        content: "",
+        draft: snapshotDraft(aiResponseRef.current),
+      });
+      toastSuccess("Berhasil!", "Transaksi berhasil dibaca dari gambar");
+    },
+    onError: (error) => {
+      toastError("Gagal!", error.message);
+    },
+  });
+
+  const imageToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        URL.revokeObjectURL(url);
+        const maxSide = 1024;
+        const scale = Math.min(
+          1,
+          maxSide / Math.max(image.width, image.height),
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(image.width * scale);
+        canvas.height = Math.round(image.height * scale);
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Canvas tidak tersedia"));
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82).split(",")[1] ?? "");
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Gagal membaca gambar"));
+      };
+      image.src = url;
+    });
+
+  const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toastError("Gagal!", "File harus berupa gambar");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toastError("Gagal!", "Ukuran gambar maksimal 10MB");
+      return;
+    }
+
+    try {
+      ocrImage.mutate({
+        image: await imageToBase64(file),
+        draft: aiResponseRef.current,
+      });
+    } catch {
+      toastError("Gagal!", "Gambar tidak bisa diproses");
+    }
+  };
 
   const blobToBase64 = (blob: Blob): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -1044,7 +1138,8 @@ const AIChatRoom = () => {
       !content ||
       sendMessage.isPending ||
       createTransaction.isPending ||
-      classifyReply.isPending
+      classifyReply.isPending ||
+      ocrImage.isPending
     )
       return;
     pushMessage({ role: "user", content });
@@ -1323,6 +1418,13 @@ const AIChatRoom = () => {
                   Memproses audio...
                 </span>
               </div>
+            ) : ocrImage.isPending ? (
+              <div className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-dl-primary/20 bg-dl-primary/5">
+                <Loader2 className="h-4 w-4 animate-spin text-dl-primary" />
+                <span className="text-xs font-medium text-dl-primary">
+                  Membaca gambar...
+                </span>
+              </div>
             ) : (
               <Textarea
                 value={input}
@@ -1336,13 +1438,39 @@ const AIChatRoom = () => {
                 placeholder="Gaji masuk 5.000.000"
                 className="min-h-12 max-h-32 flex-1 resize-none bg-white text-sm"
                 rows={1}
-                maxLength={200}
+                maxLength={2000}
               />
+            )}
+            {canUseOcr && (
+              <>
+                <Button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={
+                    ocrImage.isPending || transcribe.isPending || isRecording
+                  }
+                  className="h-12 w-12 shrink-0 bg-dl-primary/10 text-dl-primary hover:bg-dl-primary/20"
+                  aria-label="Baca gambar (OCR)"
+                >
+                  {ocrImage.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ScanText className="h-4 w-4" />
+                  )}
+                </Button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                />
+              </>
             )}
             {!voiceExhausted && (
               <Button
                 onClick={isRecording ? stopRecording : startRecording}
-                disabled={transcribe.isPending}
+                disabled={transcribe.isPending || ocrImage.isPending}
                 className={cn(
                   "h-12 w-12 shrink-0 transition-all duration-300",
                   isRecording
@@ -1366,7 +1494,8 @@ const AIChatRoom = () => {
                 !input.trim() ||
                 sendMessage.isPending ||
                 classifyReply.isPending ||
-                createTransaction.isPending
+                createTransaction.isPending ||
+                ocrImage.isPending
               }
               className="h-12 shrink-0 aspect-square bg-gradient-to-r from-dl-gradient-2 to-dl-primary text-white shadow-lg shadow-dl-primary/25 transition-all duration-300 hover:brightness-110"
               aria-label="Kirim pesan"

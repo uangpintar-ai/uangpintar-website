@@ -48,6 +48,8 @@ import {
   formatCurrency,
   formatDate,
   formatDateWithTime,
+  toWibDate,
+  WIB_OFFSET_MS,
 } from "@/lib/utils";
 import {
   Wallet,
@@ -94,9 +96,20 @@ const MONTHS = [
   "Desember",
 ];
 
-const CURRENT_YEAR = new Date().getFullYear();
-const CURRENT_MONTH = { year: CURRENT_YEAR, month: new Date().getMonth() };
+const nowWib = toWibDate();
+const CURRENT_YEAR = nowWib.getUTCFullYear();
+const CURRENT_MONTH = { year: CURRENT_YEAR, month: nowWib.getUTCMonth() };
 const YEARS = Array.from({ length: 11 }, (_, i) => CURRENT_YEAR - i);
+
+// Batas bulan/tahun WIB dikirim sebagai instant UTC ke server.
+const wibStartOfMonth = (year: number, month: number) =>
+  new Date(Date.UTC(year, month, 1) - WIB_OFFSET_MS);
+const wibEndOfMonth = (year: number, month: number) =>
+  new Date(Date.UTC(year, month + 1, 1) - 1 - WIB_OFFSET_MS);
+const wibStartOfYear = (year: number) =>
+  new Date(Date.UTC(year, 0, 1) - WIB_OFFSET_MS);
+const wibEndOfYear = (year: number) =>
+  new Date(Date.UTC(year + 1, 0, 1) - 1 - WIB_OFFSET_MS);
 
 const NO_CACHE = {
   staleTime: 0,
@@ -329,33 +342,31 @@ const UserDashboard = () => {
     ? new Date(range.to).setHours(23, 59, 59, 999)
     : undefined;
 
-  const now = new Date();
+  const currentWib = toWibDate();
   const startDate =
     filterMode === "month" && monthSel
-      ? new Date(monthSel.year, monthSel.month, 1)
+      ? wibStartOfMonth(monthSel.year, monthSel.month)
       : filterMode === "year" && yearSel
-        ? new Date(yearSel, 0, 1)
+        ? wibStartOfYear(yearSel)
         : range?.from
           ? range.from
-          : new Date(now.getFullYear(), now.getMonth(), 1);
+          : wibStartOfMonth(
+              currentWib.getUTCFullYear(),
+              currentWib.getUTCMonth(),
+            );
 
   const effectiveEndDate =
     filterMode === "month" && monthSel
-      ? new Date(monthSel.year, monthSel.month + 1, 0, 23, 59, 59, 999)
+      ? wibEndOfMonth(monthSel.year, monthSel.month)
       : filterMode === "year" && yearSel
-        ? new Date(yearSel, 11, 31, 23, 59, 59, 999)
+        ? wibEndOfYear(yearSel)
         : range?.to
           ? endDate
           : range?.from
             ? new Date(range.from).setHours(23, 59, 59, 999)
-            : new Date(
-                now.getFullYear(),
-                now.getMonth() + 1,
-                0,
-                23,
-                59,
-                59,
-                999,
+            : wibEndOfMonth(
+                currentWib.getUTCFullYear(),
+                currentWib.getUTCMonth(),
               );
 
   const categoryFilterKey = [

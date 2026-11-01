@@ -3,6 +3,14 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import crypto from "crypto";
 
+/** Aplikasi ini untuk pengguna WIB; semua tampilan tanggal memakai zona ini. */
+export const WIB_TIME_ZONE = "Asia/Jakarta";
+export const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/** Date yang komponen UTC-nya mewakili tanggal/jam dinding WIB. */
+export const toWibDate = (date: Date | string = new Date()) =>
+  new Date(new Date(date).getTime() + WIB_OFFSET_MS);
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -13,6 +21,7 @@ export function formatDate(dateString: string): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: WIB_TIME_ZONE,
   });
 }
 
@@ -22,6 +31,7 @@ export function formatLongDate(dateString?: string): string {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: WIB_TIME_ZONE,
   });
 }
 
@@ -31,6 +41,7 @@ export function formatTime(dateString: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: WIB_TIME_ZONE,
   });
 }
 
@@ -45,6 +56,7 @@ export function formatDateWithTime(dateString?: string): string {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
+        timeZone: WIB_TIME_ZONE,
       })
       .replace("pukul", ",")
       .replaceAll(".", ":") + " WIB"
@@ -62,6 +74,7 @@ export function formatLongDateWithTime(dateString?: string): string {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
+        timeZone: WIB_TIME_ZONE,
       })
       .replace("pukul", ",")
       .replaceAll(".", ":") + " WIB"
@@ -112,6 +125,7 @@ export function formatDateShortText(dateString: string): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: WIB_TIME_ZONE,
   });
 }
 

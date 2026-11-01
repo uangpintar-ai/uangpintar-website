@@ -3,11 +3,11 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/server/db";
 import { fail, ok, str, verifyBearerToken } from "@/lib/mobile-auth";
 import {
-  SYSTEM_PROMPT,
   chatCompletion,
   draftSummary,
   getOrCreateOpenSession,
   parseAIResponse,
+  systemPrompt,
 } from "@/server/services/ai-service";
 
 type Draft = {
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
   const session = await getOrCreateOpenSession(db, claims.userId);
 
   const systemContent = draft
-    ? `${SYSTEM_PROMPT}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(draft)}`
-    : SYSTEM_PROMPT;
+    ? `${systemPrompt()}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(draft)}`
+    : systemPrompt();
 
   const { content, usage } = await chatCompletion(
     [

@@ -54,3 +54,6 @@ export const isPlanId = (value: string | null | undefined): value is PlanId =>
   value === "pemula_monthly" ||
   value === "pemula_yearly" ||
   value === "jago_lifetime";
+
+export const hasOcrAccess = (status: string | null | undefined) =>
+  status === "PAKET_JAGO";

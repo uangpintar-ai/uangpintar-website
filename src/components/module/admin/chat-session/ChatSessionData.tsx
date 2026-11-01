@@ -87,6 +87,10 @@ const toDateInput = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
+const wibStartOfDay = (value: string) =>
+  new Date(`${value}T00:00:00.000+07:00`);
+const wibEndOfDay = (value: string) => new Date(`${value}T23:59:59.999+07:00`);
+
 const DateFilterInput = ({
   value,
   onChange,
@@ -144,8 +148,8 @@ const ChatSessionData = () => {
     page,
     limit,
     search: search || undefined,
-    startDate: startDate ? new Date(startDate) : undefined,
-    endDate: endDate ? new Date(endDate) : undefined,
+    startDate: startDate ? wibStartOfDay(startDate) : undefined,
+    endDate: endDate ? wibEndOfDay(endDate) : undefined,
   });
 
   return (

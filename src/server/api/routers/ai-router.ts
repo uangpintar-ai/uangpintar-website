@@ -1,11 +1,12 @@
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
+import { hasOcrAccess } from "@/const/payment";
 import {
   CLASSIFY_MODEL,
   CLASSIFY_PROMPT,
-  SYSTEM_PROMPT,
+  OCR_PROMPT,
   categoryPrompt,
   chatCompletion,
   draftSummary,
@@ -13,6 +14,7 @@ import {
   mentionsDate,
   parseAIReplyIntent,
   parseAIResponse,
+  systemPrompt,
   walletPrompt,
 } from "@/server/services/ai-service";
 
@@ -35,7 +37,7 @@ const sendMessageSchema = z.object({
   prompt: z
     .string()
     .min(1, "Prompt tidak boleh kosong")
-    .max(200, "Prompt maksimal 200 karakter"),
+    .max(2000, "Prompt maksimal 2000 karakter"),
   draft: draftSchema.optional(),
 });
 
@@ -43,8 +45,16 @@ const classifyReplySchema = z.object({
   prompt: z
     .string()
     .min(1, "Prompt tidak boleh kosong")
-    .max(200, "Prompt maksimal 200 karakter"),
+    .max(2000, "Prompt maksimal 2000 karakter"),
   draft: draftSchema,
+});
+
+const ocrImageSchema = z.object({
+  image: z
+    .string()
+    .min(100, "Gambar tidak valid")
+    .max(7_000_000, "Ukuran gambar terlalu besar"),
+  draft: draftSchema.optional(),
 });
 
 const transcribeSchema = z.object({
@@ -61,6 +71,54 @@ const sessionFilterSchema = z.object({
   startDate: z.date().optional().nullable(),
   endDate: z.date().optional().nullable(),
 });
+
+const buildTransactionDraft = async (
+  db: PrismaClient,
+  userId: string,
+  prompt: string,
+  draft?: z.infer<typeof draftSchema>,
+  maxTokens = 400,
+) => {
+  const [wallets, categories] = await Promise.all([
+    db.wallet.findMany({
+      where: { userId },
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.transactionCategory.findMany({
+      where: { userId },
+      select: { name: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
+
+  const baseSystem = `${systemPrompt()}\n\n${walletPrompt(wallets)}\n\n${categoryPrompt(categories)}`;
+  const systemContent = draft
+    ? `${baseSystem}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(draft)}`
+    : baseSystem;
+
+  const { content, usage } = await chatCompletion(
+    [
+      { role: "system", content: systemContent },
+      { role: "user", content: prompt },
+    ],
+    "xiaomi/mimo-v2.6-flash",
+    maxTokens,
+  );
+
+  const parsed = parseAIResponse(content);
+  if (parsed.type == null) parsed.type = parsed.category ?? null;
+  if (!mentionsDate(prompt)) {
+    parsed.trxDate = null;
+    parsed.trxTime = null;
+  }
+  const walletName = parsed.walletName?.trim().toLowerCase();
+  parsed.walletId =
+    wallets.find((wallet) => wallet.name.trim().toLowerCase() === walletName)
+      ?.id ?? null;
+
+  return { data: parsed, usage };
+};
 
 export const aiRouter = createTRPCRouter({
   getOrCreateSession: protectedProcedure.mutation(async ({ ctx }) => {
@@ -95,51 +153,18 @@ export const aiRouter = createTRPCRouter({
     .input(sendMessageSchema)
     .mutation(async ({ input, ctx }) => {
       const session = await getOrCreateOpenSession(ctx.db, ctx.session.userId);
-
-      const [wallets, categories] = await Promise.all([
-        ctx.db.wallet.findMany({
-          where: { userId: ctx.session.userId! },
-          select: { id: true, name: true },
-          orderBy: { createdAt: "asc" },
-        }),
-        ctx.db.transactionCategory.findMany({
-          where: { userId: ctx.session.userId! },
-          select: { name: true },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        }),
-      ]);
-
-      const baseSystem = `${SYSTEM_PROMPT}\n\n${walletPrompt(wallets)}\n\n${categoryPrompt(categories)}`;
-      const systemContent = input.draft
-        ? `${baseSystem}\n\nData transaksi sebelumnya (perbarui field yang disebut pengguna, lainnya biarkan):\n${draftSummary(input.draft)}`
-        : baseSystem;
-
-      const { content, usage } = await chatCompletion(
-        [
-          { role: "system", content: systemContent },
-          { role: "user", content: input.prompt },
-        ],
-        "xiaomi/mimo-v2.6-flash",
-        400,
+      const { data, usage } = await buildTransactionDraft(
+        ctx.db,
+        ctx.session.userId!,
+        input.prompt,
+        input.draft,
       );
-
-      const parsed = parseAIResponse(content);
-      if (parsed.type == null) parsed.type = parsed.category ?? null;
-      if (!mentionsDate(input.prompt)) {
-        parsed.trxDate = null;
-        parsed.trxTime = null;
-      }
-      const walletName = parsed.walletName?.trim().toLowerCase();
-      parsed.walletId =
-        wallets.find(
-          (wallet) => wallet.name.trim().toLowerCase() === walletName,
-        )?.id ?? null;
 
       await ctx.db.aIChatSessionDetail.create({
         data: {
           sessionId: session.id,
           prompt: input.prompt,
-          response: parsed as unknown as Prisma.InputJsonValue,
+          response: data as unknown as Prisma.InputJsonValue,
           promptTokens: usage?.prompt_tokens ?? 0,
           completionTokens: usage?.completion_tokens ?? 0,
           totalTokens: usage?.total_tokens ?? 0,
@@ -148,7 +173,7 @@ export const aiRouter = createTRPCRouter({
       });
 
       return {
-        data: parsed,
+        data,
         usage,
       };
     }),
@@ -350,6 +375,90 @@ export const aiRouter = createTRPCRouter({
       return {
         text: data.text,
         usage,
+      };
+    }),
+
+  ocrImage: protectedProcedure
+    .input(ocrImageSchema)
+    .mutation(async ({ input, ctx }) => {
+      const user = await ctx.db.user.findUnique({
+        where: { id: ctx.session.userId! },
+        select: { status: true },
+      });
+      if (!hasOcrAccess(user?.status)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Fitur foto struk (OCR) hanya tersedia di Paket Jago",
+        });
+      }
+
+      const { content, usage: ocrUsage } = await chatCompletion(
+        [
+          { role: "system", content: OCR_PROMPT },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Baca semua teks pada gambar ini (struk, nota, atau bukti transaksi).",
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${input.image}`,
+                },
+              },
+            ],
+          },
+        ],
+        "xiaomi/mimo-v2.6-flash",
+        800,
+      );
+
+      const text = content.trim();
+
+      if (!text) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Tidak ada teks yang terbaca pada gambar",
+        });
+      }
+
+      const session = await getOrCreateOpenSession(ctx.db, ctx.session.userId);
+      await ctx.db.aIChatTranscription.create({
+        data: {
+          sessionId: session.id,
+          text,
+          seconds: 0,
+          cost: ocrUsage?.cost ?? 0,
+        },
+      });
+
+      const { data, usage } = await buildTransactionDraft(
+        ctx.db,
+        ctx.session.userId!,
+        text,
+        input.draft,
+        800,
+      );
+
+      await ctx.db.aIChatSessionDetail.create({
+        data: {
+          sessionId: session.id,
+          prompt: "📷 Foto transaksi",
+          response: data as unknown as Prisma.InputJsonValue,
+          promptTokens: usage?.prompt_tokens ?? 0,
+          completionTokens: usage?.completion_tokens ?? 0,
+          totalTokens: usage?.total_tokens ?? 0,
+          cost: usage?.cost ?? 0,
+        },
+      });
+
+      return {
+        data,
+        usage: usage
+          ? { ...usage, cost: (usage.cost ?? 0) + (ocrUsage?.cost ?? 0) }
+          : ocrUsage,
       };
     }),
 });

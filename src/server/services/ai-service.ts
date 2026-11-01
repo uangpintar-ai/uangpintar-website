@@ -7,13 +7,14 @@ import type {
 } from "@/server/api/types/ai-type";
 import { DEFAULT_CATEGORIES } from "@/server/services/category-service";
 
-const wib = new Date().toLocaleString("sv-SE", {
-  timeZone: "Asia/Jakarta",
-});
-
-export const SYSTEM_PROMPT = `Waktu: ${wib} (WIB). Ubah transaksi menjadi JSON saja:
+export const systemPrompt = () => {
+  const wib = new Date().toLocaleString("sv-SE", {
+    timeZone: "Asia/Jakarta",
+  });
+  return `Waktu: ${wib} (WIB). Ubah transaksi menjadi JSON saja:
 {"type":"INCOME"|"EXPENSE"|null,"purpose":string|null,"details":[{"name":string,"amount":number,"category":string|null}],"trxDate":"YYYY-MM-DD"|null,"trxTime":"HH:mm"|null,"walletName":string|null}
-INCOME=masuk, EXPENSE=keluar. details berisi rincian item (nama + nominal + kategori), null jika tak disebut. amount angka tanpa format (50000). category diisi nama kategori dari daftar kategori pengguna. Isi trxDate/trxTime HANYA jika pengguna menyebut tanggal atau jam secara eksplisit; selain itu null. Jangan mengarang tanggal. Waktu relatif ke sekarang.`;
+INCOME=masuk, EXPENSE=keluar. details berisi rincian item (nama + nominal + kategori), null jika tak disebut. amount angka tanpa format (50000). category diisi nama kategori dari daftar kategori pengguna. Isi trxDate/trxTime HANYA jika pengguna menyebut tanggal atau jam secara eksplisit; selain itu null. Jangan mengarang tanggal. Waktu relatif ke sekarang. Tanggal dari OCR/gambar sudah berformat YYYY-MM-DD; jangan menukar hari dan bulan.`;
+};
 
 const DATE_HINT =
   /\b(\d{1,2}[-/.]\d{1,2}([-/.]\d{2,4})?|\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}:\d{2}|hari ini|kemarin|tadi|lusa|besok|minggu|senin|selasa|rabu|kamis|jumat|sabtu|tanggal|tgl|pukul|jam|tahun|bulan|januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\b/i;
@@ -44,6 +45,8 @@ export const CLASSIFY_PROMPT = `Tentukan intent balasan atas transaksi tertunda.
 
 export const CLASSIFY_MODEL = "xiaomi/mimo-v2.6-flash";
 
+export const OCR_PROMPT = `Baca struk/nota/bukti transfer ini. Balas JSON saja: {"type":"INCOME"|"EXPENSE"|null,"purpose":string|null,"details":[{"name":string,"amount":number}],"trxDate":"YYYY-MM-DD"|null,"trxTime":"HH:mm"|null}. amount angka tanpa format. Tanggal di struk Indonesia format DD/MM/YY(YY); ubah ke YYYY-MM-DD (contoh 01/11/26 = 2026-11-01), jangan tukar hari dan bulan. Jangan mengarang.`;
+
 export const draftSummary = (draft: {
   type?: string | null;
   category?: string | null;
@@ -72,10 +75,18 @@ export const draftSummary = (draft: {
   ].join("\n");
 };
 
+type ChatMessageContent =
+  | string
+  | (
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    )[];
+
 export const chatCompletion = async (
-  messages: { role: "system" | "user"; content: string }[],
+  messages: { role: "system" | "user"; content: ChatMessageContent }[],
   model = "xiaomi/mimo-v2.6-flash",
   maxTokens = 200,
+  jsonMode = true,
 ): Promise<{
   content: string;
   usage: TAIChatCompletionUsage | null;
@@ -94,7 +105,7 @@ export const chatCompletion = async (
       body: JSON.stringify({
         model,
         messages,
-        response_format: { type: "json_object" },
+        ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
         max_tokens: maxTokens,
         temperature: 0.2,
         reasoning: { effort: "none" },

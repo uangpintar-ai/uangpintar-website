@@ -48,6 +48,10 @@ const toDateInput = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
+const wibStartOfDay = (value: string) =>
+  new Date(`${value}T00:00:00.000+07:00`);
+const wibEndOfDay = (value: string) => new Date(`${value}T23:59:59.999+07:00`);
+
 const DateFilterInput = ({
   value,
   onChange,
@@ -118,8 +122,8 @@ const TransactionData = () => {
     limit,
     search: search || undefined,
     type: type === "all" ? undefined : type,
-    start_date: startDate ? new Date(startDate) : undefined,
-    end_date: endDate ? new Date(endDate) : undefined,
+    start_date: startDate ? wibStartOfDay(startDate) : undefined,
+    end_date: endDate ? wibEndOfDay(endDate) : undefined,
   });
 
   return (
