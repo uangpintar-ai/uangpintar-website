@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
+  ChartNoAxesCombined,
   Home,
   User,
   Users,
@@ -33,6 +34,11 @@ export const navItems = [
   { label: "User", href: "/tdibmkr/users", icon: Users },
   { label: "Transaksi", href: "/tdibmkr/transactions", icon: NotebookPen },
   { label: "Chat Session", href: "/tdibmkr/chat-sessions", icon: FaRobot },
+  {
+    label: "Analisis AI",
+    href: "/tdibmkr/analysis",
+    icon: ChartNoAxesCombined,
+  },
 ];
 
 const AdminSidebarContent = ({

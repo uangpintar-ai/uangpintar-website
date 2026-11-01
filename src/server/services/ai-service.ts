@@ -135,6 +135,93 @@ export const chatCompletion = async (
   return { content, usage: data.usage ?? null };
 };
 
+export type AIChatToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+};
+
+export type AIChatMessage =
+  | { role: "system" | "user"; content: string }
+  | {
+      role: "assistant";
+      content: string | null;
+      tool_calls?: AIChatToolCall[];
+    }
+  | { role: "tool"; content: string; tool_call_id: string };
+
+export type AIChatTool = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+export const chatCompletionWithTools = async (
+  messages: AIChatMessage[],
+  tools: AIChatTool[],
+  model = "xiaomi/mimo-v2.6-flash",
+  maxTokens = 700,
+): Promise<{
+  message: { content: string | null; tool_calls?: AIChatToolCall[] };
+  usage: TAIChatCompletionUsage | null;
+}> => {
+  const apiKey = process.env.OPENROUTER;
+  if (!apiKey) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+  let res: Response;
+  try {
+    res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        ...(tools.length
+          ? { tools, tool_choice: "auto", parallel_tool_calls: true }
+          : {}),
+        max_tokens: maxTokens,
+        temperature: 0.2,
+        reasoning: { effort: "none" },
+      }),
+    });
+  } catch {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Gagal terhubung ke layanan AI",
+    });
+  }
+
+  if (!res.ok) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Layanan AI error: ${res.status}`,
+    });
+  }
+
+  const data = (await res.json()) as {
+    choices?: {
+      message?: { content?: string | null; tool_calls?: AIChatToolCall[] };
+    }[];
+    usage?: TAIChatCompletionUsage;
+  };
+  const message = data.choices?.[0]?.message;
+  if (!message) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+  return {
+    message: {
+      content: message.content ?? null,
+      tool_calls: message.tool_calls,
+    },
+    usage: data.usage ?? null,
+  };
+};
+
 export const getOrCreateOpenSession = async (
   db: PrismaClient,
   userId: string | undefined,

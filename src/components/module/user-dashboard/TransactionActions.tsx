@@ -584,7 +584,7 @@ const TransactionActions = ({ item, variant = "icon" }: Props) => {
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Simpan Perubahan
+                  Simpan
                 </>
               )}
             </Button>

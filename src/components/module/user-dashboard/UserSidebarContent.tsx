@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import {
+  ChartNoAxesCombined,
   Home,
   NotebookPen,
   Receipt,
@@ -42,6 +43,11 @@ const navItems = [
     label: "Catat dengan AI",
     href: "/user",
     icon: Sparkles,
+  },
+  {
+    label: "Analisis AI",
+    href: "/user/analysis",
+    icon: ChartNoAxesCombined,
   },
   {
     label: "Riwayat Pembayaran",

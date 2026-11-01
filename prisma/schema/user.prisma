@@ -18,6 +18,7 @@ model User {
   wallets               Wallet[]
   transactionCategories TransactionCategory[]
   aiChatSessions        AIChatSession[]
+  aiAnalysisSessions    AIAnalysisSession[]
   payments              Payment[]
 
   @@map("users")

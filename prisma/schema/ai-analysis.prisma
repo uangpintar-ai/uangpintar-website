@@ -1,0 +1,29 @@
+model AIAnalysisSession {
+  id        String              @id @default(uuid())
+  userId    String
+  title     String
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AIAnalysisMessage[]
+
+  @@index([userId, updatedAt])
+  @@map("ai_analysis_sessions")
+}
+
+model AIAnalysisMessage {
+  id               String            @id @default(uuid())
+  sessionId        String
+  role             String
+  content          String
+  toolCalls        Json?             @map("tool_calls")
+  promptTokens     Float             @default(0) @map("prompt_tokens")
+  completionTokens Float             @default(0) @map("completion_tokens")
+  totalTokens      Float             @default(0) @map("total_tokens")
+  cost             Float             @default(0)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  session          AIAnalysisSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("ai_analysis_messages")
+}

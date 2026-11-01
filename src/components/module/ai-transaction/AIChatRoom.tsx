@@ -8,6 +8,7 @@ import {
   Bot,
   CalendarDays,
   Calculator,
+  ChartNoAxesCombined,
   Clock,
   HelpCircle,
   Loader2,
@@ -32,6 +33,7 @@ import {
   PiFloppyDisk,
   PiPencilSimple,
   PiReceipt,
+  PiWallet,
 } from "react-icons/pi";
 import { TransactionCategoryIcon } from "@/const/general/transaction-category-icons";
 import { hasOcrAccess } from "@/const/payment";
@@ -548,6 +550,7 @@ const DraftEditModal = ({
 type TransactionCardProps = {
   draft: TransactionDraft;
   categories: CategoryOption[];
+  walletName: string;
   showActions: boolean;
   saving: boolean;
   onSave: () => void;
@@ -557,6 +560,7 @@ type TransactionCardProps = {
 const TransactionCard = ({
   draft,
   categories,
+  walletName,
   showActions,
   saving,
   onSave,
@@ -682,14 +686,25 @@ const TransactionCard = ({
         </>
       )}
 
-      <div className="mt-1.5 rounded-lg bg-dl-background px-3 py-1.5">
-        <p className="flex items-center gap-1 text-[10px] text-dl-muted">
-          <PiCalendarBlank className="h-3 w-3" />
-          Tanggal
-        </p>
-        <p className="mt-0.5 text-[11px] text-dl-foreground">
-          {date ? formatDateWithTime(date.toISOString()) : "-"}
-        </p>
+      <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+        <div className="rounded-lg bg-dl-background px-3 py-1.5">
+          <p className="flex items-center gap-1 text-[10px] text-dl-muted">
+            <PiWallet className="h-3 w-3" />
+            Dompet
+          </p>
+          <p className="mt-0.5 text-[11px] break-words text-dl-foreground">
+            {walletName || "-"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-dl-background px-3 py-1.5">
+          <p className="flex items-center gap-1 text-[10px] text-dl-muted">
+            <PiCalendarBlank className="h-3 w-3" />
+            Tanggal
+          </p>
+          <p className="mt-0.5 text-[11px] text-dl-foreground">
+            {date ? formatDateWithTime(date.toISOString()) : "-"}
+          </p>
+        </div>
       </div>
 
       {showActions && (
@@ -761,7 +776,9 @@ const AIChatRoom = () => {
   );
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const voiceSecondsRef = useRef(0);
+  const voiceSecondsBeforeRecordingRef = useRef(0);
   const cancelRecordingRef = useRef(false);
+  const cancelReasonRef = useRef<"manual" | "limit" | null>(null);
 
   const pushMessage = (message: Omit<Message, "id">) => {
     const id = ++idRef.current;
@@ -1032,10 +1049,15 @@ const AIChatRoom = () => {
         setIsRecording(false);
         if (cancelRecordingRef.current) {
           cancelRecordingRef.current = false;
+          voiceSecondsRef.current = voiceSecondsBeforeRecordingRef.current;
+          setUsedVoiceSeconds(voiceSecondsBeforeRecordingRef.current);
           toastError(
             "Dibatalkan!",
-            `Maksimal ${MAX_VOICE_SECONDS} detik per sesi`,
+            cancelReasonRef.current === "limit"
+              ? `Maksimal ${MAX_VOICE_SECONDS} detik per sesi`
+              : "Rekaman dibatalkan",
           );
+          cancelReasonRef.current = null;
           return;
         }
         const blob = new Blob(chunksRef.current, {
@@ -1046,16 +1068,20 @@ const AIChatRoom = () => {
       recorder.start();
       mediaRecorderRef.current = recorder;
       cancelRecordingRef.current = false;
+      cancelReasonRef.current = null;
+      voiceSecondsBeforeRecordingRef.current = voiceSecondsRef.current;
       recordingTimerRef.current = setInterval(() => {
         voiceSecondsRef.current += 1;
         setUsedVoiceSeconds(voiceSecondsRef.current);
         if (voiceSecondsRef.current >= MAX_VOICE_SECONDS) {
+          cancelReasonRef.current = "limit";
           cancelRecordingRef.current = true;
           mediaRecorderRef.current?.stop();
         }
       }, 1000);
       recordingTimeoutRef.current = setTimeout(
         () => {
+          cancelReasonRef.current = "limit";
           cancelRecordingRef.current = true;
           mediaRecorderRef.current?.stop();
         },
@@ -1068,6 +1094,12 @@ const AIChatRoom = () => {
   };
 
   const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+  };
+
+  const cancelRecording = () => {
+    cancelReasonRef.current = "manual";
+    cancelRecordingRef.current = true;
     mediaRecorderRef.current?.stop();
   };
 
@@ -1130,6 +1162,16 @@ const AIChatRoom = () => {
       trx_date: draftDate(aiResponseRef.current) ?? new Date(),
       walletId: walletId || undefined,
     });
+  };
+
+  const walletLabel = (draft: TransactionDraft, isLast: boolean) => {
+    const id = isLast ? walletId || draft.walletId : draft.walletId;
+    return (
+      wallets?.find((wallet) => wallet.id === id)?.name ||
+      draft.walletName ||
+      wallets?.[0]?.name ||
+      "-"
+    );
   };
 
   const send = () => {
@@ -1311,6 +1353,7 @@ const AIChatRoom = () => {
                 <TransactionCard
                   draft={message.draft}
                   categories={categories ?? []}
+                  walletName={walletLabel(message.draft, isLast)}
                   showActions={isLast && isComplete(message.draft)}
                   saving={createTransaction.isPending}
                   onSave={saveDraft}
@@ -1395,9 +1438,9 @@ const AIChatRoom = () => {
         </div>
       ) : (
         <div className="border-t border-dl-border pt-3">
-          <div className="flex items-end gap-2">
+          <div className="rounded-xl border border-dl-border bg-white p-2 shadow-sm focus-within:border-dl-primary/40">
             {isRecording ? (
-              <div className="flex min-h-12 flex-1 items-center justify-center gap-1 rounded-lg border border-dl-error/30 bg-dl-error/5">
+              <div className="flex min-h-10 items-center justify-center gap-1 rounded-lg bg-dl-error/5">
                 <span className="mr-2 text-xs font-medium text-dl-error">
                   Merekam...
                 </span>
@@ -1412,14 +1455,14 @@ const AIChatRoom = () => {
                 )}
               </div>
             ) : transcribe.isPending ? (
-              <div className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-dl-primary/20 bg-dl-primary/5">
+              <div className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-dl-primary/5">
                 <Loader2 className="h-4 w-4 animate-spin text-dl-primary" />
                 <span className="text-xs font-medium text-dl-primary">
                   Memproses audio...
                 </span>
               </div>
             ) : ocrImage.isPending ? (
-              <div className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-lg border border-dl-primary/20 bg-dl-primary/5">
+              <div className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-dl-primary/5">
                 <Loader2 className="h-4 w-4 animate-spin text-dl-primary" />
                 <span className="text-xs font-medium text-dl-primary">
                   Membaca gambar...
@@ -1436,72 +1479,102 @@ const AIChatRoom = () => {
                   }
                 }}
                 placeholder="Gaji masuk 5.000.000"
-                className="min-h-12 max-h-32 flex-1 resize-none bg-white text-sm"
+                className="min-h-10 max-h-32 resize-none border-0 bg-transparent px-1 py-1 text-sm shadow-none focus-visible:ring-0"
                 rows={1}
                 maxLength={2000}
               />
             )}
-            {canUseOcr && (
-              <>
+            <div className="mt-1 flex items-center justify-between gap-2 border-t border-dl-border/60 pt-2">
+              <div className="flex items-center gap-1.5">
+                {canUseOcr && (
+                  <>
+                    <Button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={
+                        ocrImage.isPending ||
+                        transcribe.isPending ||
+                        isRecording
+                      }
+                      className="h-9 w-9 rounded-lg bg-dl-background text-dl-foreground hover:bg-dl-primary/10 hover:text-dl-primary"
+                      aria-label="Baca gambar (OCR)"
+                    >
+                      {ocrImage.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ScanText className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                  </>
+                )}
+                {!voiceExhausted && (
+                  <Button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={transcribe.isPending || ocrImage.isPending}
+                    className={cn(
+                      "h-9 w-9 rounded-lg transition-all duration-300",
+                      isRecording
+                        ? "bg-dl-error text-white shadow-lg shadow-dl-error/40 animate-pulse"
+                        : "bg-dl-background text-dl-foreground hover:bg-dl-primary/10 hover:text-dl-primary",
+                    )}
+                    aria-label={
+                      isRecording ? "Berhenti merekam" : "Rekam suara"
+                    }
+                  >
+                    {transcribe.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isRecording ? (
+                      <MicOff className="h-4 w-4" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
                 <Button
                   type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={
-                    ocrImage.isPending || transcribe.isPending || isRecording
-                  }
-                  className="h-12 w-12 shrink-0 bg-dl-primary/10 text-dl-primary hover:bg-dl-primary/20"
-                  aria-label="Baca gambar (OCR)"
+                  onClick={() => router.push("/user/analysis")}
+                  disabled={isRecording}
+                  className="h-9 gap-1.5 rounded-lg bg-dl-background px-3 text-xs text-dl-foreground hover:bg-dl-primary/10 hover:text-dl-primary"
+                  aria-label="Buka Analisis AI"
                 >
-                  {ocrImage.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ScanText className="h-4 w-4" />
-                  )}
+                  <ChartNoAxesCombined className="h-4 w-4" />
+                  <span className="hidden sm:inline">Analisis AI</span>
                 </Button>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageSelect}
-                />
-              </>
-            )}
-            {!voiceExhausted && (
-              <Button
-                onClick={isRecording ? stopRecording : startRecording}
-                disabled={transcribe.isPending || ocrImage.isPending}
-                className={cn(
-                  "h-12 w-12 shrink-0 transition-all duration-300",
-                  isRecording
-                    ? "bg-dl-error text-white shadow-lg shadow-dl-error/40 animate-pulse"
-                    : "bg-dl-primary/10 text-dl-primary hover:bg-dl-primary/20",
-                )}
-                aria-label={isRecording ? "Berhenti merekam" : "Rekam suara"}
-              >
-                {transcribe.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isRecording ? (
-                  <MicOff className="h-4 w-4" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-            <Button
-              onClick={send}
-              disabled={
-                !input.trim() ||
-                sendMessage.isPending ||
-                classifyReply.isPending ||
-                createTransaction.isPending ||
-                ocrImage.isPending
-              }
-              className="h-12 shrink-0 aspect-square bg-gradient-to-r from-dl-gradient-2 to-dl-primary text-white shadow-lg shadow-dl-primary/25 transition-all duration-300 hover:brightness-110"
-              aria-label="Kirim pesan"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+              </div>
+              {isRecording ? (
+                <Button
+                  onClick={cancelRecording}
+                  className="h-9 shrink-0 rounded-lg bg-dl-error px-4 text-xs text-white shadow-lg shadow-dl-error/25 transition-all duration-300 hover:bg-dl-error/90"
+                  aria-label="Batalkan rekaman"
+                >
+                  Batal
+                </Button>
+              ) : (
+                <Button
+                  onClick={send}
+                  disabled={
+                    !input.trim() ||
+                    sendMessage.isPending ||
+                    classifyReply.isPending ||
+                    createTransaction.isPending ||
+                    ocrImage.isPending ||
+                    transcribe.isPending
+                  }
+                  className="h-9 shrink-0 gap-1.5 rounded-lg bg-gradient-to-r from-dl-gradient-2 to-dl-primary px-4 text-xs text-white shadow-lg shadow-dl-primary/25 transition-all duration-300 hover:brightness-110"
+                  aria-label="Kirim pesan"
+                >
+                  <Send className="h-4 w-4" />
+                  Kirim
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}

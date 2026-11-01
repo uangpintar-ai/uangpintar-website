@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { SessionProvider, signOut } from "next-auth/react";
 import {
+  ChartNoAxesCombined,
   Ellipsis,
   Home,
   LogOut,
@@ -41,6 +42,11 @@ const bottomNavItems = [
 const moreNavItems = [
   { label: "Dompet", href: "/user/wallets", icon: Wallet },
   { label: "Kategori", href: "/user/categories", icon: Tags },
+  {
+    label: "Analisis AI",
+    href: "/user/analysis",
+    icon: ChartNoAxesCombined,
+  },
   {
     label: "Riwayat Pembayaran",
     href: "/user/payment-history",

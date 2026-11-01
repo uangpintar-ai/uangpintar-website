@@ -57,3 +57,6 @@ export const isPlanId = (value: string | null | undefined): value is PlanId =>
 
 export const hasOcrAccess = (status: string | null | undefined) =>
   status === "PAKET_JAGO";
+
+export const hasAnalysisAccess = (status: string | null | undefined) =>
+  status === "PAKET_JAGO";

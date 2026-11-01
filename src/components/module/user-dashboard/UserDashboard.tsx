@@ -1040,17 +1040,17 @@ const UserDashboard = () => {
                               </TableCell>
                               <TableCell className="px-4 py-3 align-top">
                                 {item.details.length > 0 ? (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-dl-foreground"
+                                  <button
+                                    type="button"
                                     onClick={() => {
                                       setSelectedItem(item);
                                       setDetailOpen(true);
                                     }}
+                                    className="cursor-pointer text-xs font-medium text-dl-foreground underline underline-offset-2 transition-colors hover:text-dl-primary"
+                                    aria-label={`Lihat ${item.details.length} rincian`}
                                   >
                                     Lihat Rincian
-                                  </Button>
+                                  </button>
                                 ) : (
                                   <span className="text-xs text-dl-muted">
                                     -
