@@ -845,29 +845,39 @@
 
 .up-landing .tgrid {
   margin-top: 40px;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 24px;
 }
 
 .up-landing .tcard {
-  flex: 1 1 320px;
-  min-width: 0;
   margin: 0;
-  background: var(--bg);
-  border: 2px dashed var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 28px;
+  padding: 30px 28px 26px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  box-shadow: 0 1px 2px rgba(11, 31, 26, 0.04);
 }
 
 .up-landing .tcard blockquote {
   margin: 0;
-  font-size: 18px;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.65;
   font-weight: 600;
+}
+
+.up-landing .tcard blockquote::before {
+  content: "\201C";
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 56px;
+  line-height: 0.7;
+  margin-bottom: 14px;
+  color: var(--teal-700);
+  opacity: 0.3;
 }
 
 .up-landing .tcard .res {
@@ -875,35 +885,54 @@
   background: var(--mint);
   border-radius: 12px;
   font-size: 14px;
+  line-height: 1.45;
   font-weight: 700;
   color: var(--teal-900);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.up-landing .tcard .res::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--teal-700);
 }
 
 .up-landing .tcard figcaption {
   margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  gap: 3px;
   font-size: 15px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.up-landing .tcard .ph {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--mint);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  display: inline-flex;
+.up-landing .tcard figcaption strong {
+  display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  font-weight: 800;
+}
+
+.up-landing .tcard figcaption strong::before {
+  content: "";
   flex: none;
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--lime);
 }
 
 .up-landing .tcard figcaption span.s {
   color: var(--muted);
+  font-size: 13px;
 }
 
 .up-landing .packs {
