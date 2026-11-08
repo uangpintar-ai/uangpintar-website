@@ -1,5 +1,7 @@
 import type { UserStatus } from "@prisma/client";
 
+export const PAYMENT_COOKIE_NAME = "checkout_payment_id";
+
 export type PlanId = "pemula_monthly" | "pemula_yearly" | "jago_lifetime";
 
 export type PlanPrices = Record<PlanId, number> & {

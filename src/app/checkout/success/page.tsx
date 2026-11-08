@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/server/db";
-import { PLANS, isPlanId } from "@/const/payment";
+import { PAYMENT_COOKIE_NAME, PLANS, isPlanId } from "@/const/payment";
 import PaymentSuccess from "@/components/module/checkout/PaymentSuccess";
 
 export const metadata: Metadata = {
@@ -12,12 +13,8 @@ export const metadata: Metadata = {
   },
 };
 
-type Props = {
-  searchParams: Promise<{ paymentId?: string }>;
-};
-
-const PaymentSuccessPage = async ({ searchParams }: Props) => {
-  const { paymentId } = await searchParams;
+const PaymentSuccessPage = async () => {
+  const paymentId = (await cookies()).get(PAYMENT_COOKIE_NAME)?.value;
 
   if (!paymentId) {
     redirect("/checkout");

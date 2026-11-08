@@ -349,9 +349,7 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
       }
 
       if (payload.status === "PAID") {
-        router.push(
-          `/checkout/success?paymentId=${encodeURIComponent(payment.paymentId)}`,
-        );
+        router.push("/checkout/success");
         return;
       }
 
@@ -391,9 +389,7 @@ const PurchaseCheckout = ({ initialPlan, prices }: Props) => {
           if (payload?.status !== "PAID") return;
 
           clearInterval(interval);
-          router.push(
-            `/checkout/success?paymentId=${encodeURIComponent(paymentId)}`,
-          );
+          router.push("/checkout/success");
         })
         .catch(() => undefined);
     }, 5000);

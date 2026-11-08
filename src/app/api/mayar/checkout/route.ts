@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/server/auth/auth-options";
 import { db } from "@/server/db";
-import { isPlanId, PLANS } from "@/const/payment";
+import { isPlanId, PAYMENT_COOKIE_NAME, PLANS } from "@/const/payment";
 import { isMayarPaymentMethod } from "@/const/mayar-payment";
 import { createMayarInvoice } from "@/lib/mayar";
 import {
@@ -27,6 +27,20 @@ type CheckoutBody = {
 
 const normalizeMobile = (value: string) => value.replace(/[\s-]/g, "");
 const isValidMobile = (value: string) => /^\+?\d{10,15}$/.test(value);
+
+const paymentJson = <T>(body: T, paymentId: string) => {
+  const response = NextResponse.json(body);
+
+  response.cookies.set(PAYMENT_COOKIE_NAME, paymentId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24,
+  });
+
+  return response;
+};
 
 export const POST = async (request: Request) => {
   const body = (await request.json().catch(() => null)) as CheckoutBody | null;
@@ -71,7 +85,10 @@ export const POST = async (request: Request) => {
     });
 
     if (pending?.link) {
-      return NextResponse.json({ link: pending.link, paymentId: pending.id });
+      return paymentJson(
+        { link: pending.link, paymentId: pending.id },
+        pending.id,
+      );
     }
   }
 
@@ -348,11 +365,14 @@ export const POST = async (request: Request) => {
       },
     });
 
-    return NextResponse.json({
-      link: invoice.link,
-      paymentId: payment.id,
-      paymentDetail: invoice.paymentDetail,
-    });
+    return paymentJson(
+      {
+        link: invoice.link,
+        paymentId: payment.id,
+        paymentDetail: invoice.paymentDetail,
+      },
+      payment.id,
+    );
   } catch (error) {
     await db.payment.update({
       where: { id: payment.id },
