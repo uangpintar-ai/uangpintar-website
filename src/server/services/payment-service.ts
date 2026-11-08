@@ -122,6 +122,7 @@ export const applyPlan = async (
       status: plan.status,
       maxAISession: plan.maxAISession,
       aiSessionCount: 0,
+      aiSessionResetAt: now,
       packageStart: active ? user.packageStart : now,
       packageRnd: end,
     },

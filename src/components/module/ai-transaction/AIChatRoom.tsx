@@ -1212,7 +1212,7 @@ const AIChatRoom = () => {
             Jatah AI gratis kamu sudah habis
           </h2>
           <p className="max-w-sm text-sm text-dl-muted">
-            Kamu sudah menggunakan {aiSessionCount} sesi chat AI hari ini.
+            Kamu sudah menggunakan {aiSessionCount} sesi chat AI bulan ini.
             Upgrade paketmu untuk terus mencatat dengan bantuan AI.
           </p>
           <Button
@@ -1231,11 +1231,12 @@ const AIChatRoom = () => {
           <AlertTriangle className="h-7 w-7 text-dl-error" />
         </div>
         <h2 className="text-xl font-bold text-dl-foreground">
-          Jatah AI kamu sudah habis untuk hari ini
+          Jatah AI kamu sudah habis untuk bulan ini
         </h2>
         <p className="max-w-sm text-sm text-dl-muted">
-          Kamu sudah menggunakan {aiSessionCount} sesi chat AI hari ini. Lakukan
-          pencatatan manual untuk tetap mencatat pemasukan dan pengeluaranmu.
+          Kamu sudah menggunakan {aiSessionCount} sesi chat AI bulan ini.
+          Lakukan pencatatan manual untuk tetap mencatat pemasukan dan
+          pengeluaranmu.
         </p>
         <Button
           onClick={() => router.push("/user/manual-transaction")}

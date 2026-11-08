@@ -8,6 +8,7 @@ model User {
   balance               Float                 @default(0)
   aiSessionCount        Int                   @default(0)
   maxAISession          Int
+  aiSessionResetAt      DateTime              @default(now()) @map("ai_session_reset_at")
   role                  Role                  @default(USER)
   status                UserStatus            @default(UNVERIFIED)
   packageStart          DateTime
