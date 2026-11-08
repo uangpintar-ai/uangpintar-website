@@ -7,6 +7,7 @@ import { aiRouter } from "@/server/api/routers/ai-router";
 import { walletRouter } from "@/server/api/routers/wallet-router";
 import { categoryRouter } from "@/server/api/routers/category-router";
 import { analysisRouter } from "@/server/api/routers/analysis-router";
+import { budgetRouter } from "@/server/api/routers/budget-router";
 
 /**
  * This is the primary router for your server.
@@ -22,6 +23,7 @@ export const appRouter = createTRPCRouter({
   admin: adminRouter,
   ai: aiRouter,
   analysis: analysisRouter,
+  budget: budgetRouter,
 });
 
 // export type definition of API

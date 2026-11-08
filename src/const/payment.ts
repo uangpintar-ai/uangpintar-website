@@ -62,3 +62,9 @@ export const hasOcrAccess = (status: string | null | undefined) =>
 
 export const hasAnalysisAccess = (status: string | null | undefined) =>
   status === "PAKET_JAGO";
+
+export const hasBudgetingAccess = (status: string | null | undefined) =>
+  status === "GRATIS" ||
+  status === "PEMULA_BULANAN" ||
+  status === "PEMULA_TAHUNAN" ||
+  status === "PAKET_JAGO";

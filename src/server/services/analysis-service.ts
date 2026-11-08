@@ -17,6 +17,7 @@ const monthArg = z.string().regex(MONTH_RE).optional();
 const typeArg = z.enum(["INCOME", "EXPENSE"]).optional();
 
 const summarySchema = z.object({ month: monthArg });
+const budgetSchema = z.object({ month: monthArg });
 const categorySchema = z.object({ month: monthArg, type: typeArg });
 const trendSchema = z.object({
   months: z.number().int().min(1).max(12).optional(),
@@ -61,7 +62,7 @@ const getSummary = async (
   args: z.infer<typeof summarySchema>,
 ) => {
   const info = monthInfo(args.month);
-  const [transactions, user, wallets] = await Promise.all([
+  const [transactions, user, wallets, budget] = await Promise.all([
     db.transaction.findMany({
       where: { userId, trxDate: { gte: info.start, lte: info.end } },
       select: { type: true, totalAmount: true },
@@ -72,6 +73,10 @@ const getSummary = async (
       select: { name: true, balance: true },
       orderBy: { createdAt: "asc" },
     }),
+    db.budget.findUnique({
+      where: { userId_month: { userId, month: info.label } },
+      include: { items: { select: { amount: true } } },
+    }),
   ]);
 
   let income = 0;
@@ -80,6 +85,9 @@ const getSummary = async (
     if (transaction.type === "INCOME") income += transaction.totalAmount;
     else expense += transaction.totalAmount;
   }
+
+  const budgetPlanned =
+    budget?.items.reduce((sum, item) => sum + item.amount, 0) ?? 0;
 
   return {
     month: info.label,
@@ -93,6 +101,55 @@ const getSummary = async (
     wallets: wallets.map((wallet) => ({
       name: wallet.name,
       balance: roundMoney(wallet.balance),
+    })),
+    budget: budget
+      ? {
+          plannedAmount: roundMoney(budgetPlanned),
+          remaining: roundMoney(budgetPlanned - expense),
+          overBudget: budgetPlanned > 0 ? expense > budgetPlanned : null,
+        }
+      : null,
+  };
+};
+
+const getBudget = async (
+  userId: string,
+  args: z.infer<typeof budgetSchema>,
+) => {
+  const info = monthInfo(args.month);
+  const [budget, expenses] = await Promise.all([
+    db.budget.findUnique({
+      where: { userId_month: { userId, month: info.label } },
+      include: { items: { orderBy: { createdAt: "asc" } } },
+    }),
+    db.transaction.findMany({
+      where: {
+        userId,
+        type: "EXPENSE",
+        trxDate: { gte: info.start, lte: info.end },
+      },
+      select: { totalAmount: true },
+    }),
+  ]);
+
+  const items = budget?.items ?? [];
+  const plannedAmount = items.reduce((sum, item) => sum + item.amount, 0);
+  const actualExpense = expenses.reduce(
+    (sum, transaction) => sum + transaction.totalAmount,
+    0,
+  );
+
+  return {
+    month: info.label,
+    hasBudget: Boolean(budget),
+    itemCount: items.length,
+    plannedAmount: roundMoney(plannedAmount),
+    actualExpense: roundMoney(actualExpense),
+    remaining: roundMoney(plannedAmount - actualExpense),
+    overBudget: plannedAmount > 0 ? actualExpense > plannedAmount : null,
+    items: items.slice(0, 20).map((item) => ({
+      name: item.name.slice(0, 80),
+      amount: roundMoney(item.amount),
     })),
   };
 };
@@ -274,7 +331,22 @@ export const ANALYSIS_TOOLS: AIChatTool[] = [
     function: {
       name: "get_summary",
       description:
-        "Ringkasan pemasukan, pengeluaran, selisih, rasio tabungan, dan saldo dompet untuk satu bulan (YYYY-MM). Isi month kosong untuk bulan berjalan.",
+        "Ringkasan pemasukan, pengeluaran, selisih, rasio tabungan, saldo dompet, dan ringkasan budgeting (jika ada) untuk satu bulan (YYYY-MM). Isi month kosong untuk bulan berjalan.",
+      parameters: {
+        type: "object",
+        properties: {
+          month: { type: "string", description: "Bulan format YYYY-MM" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_budget",
+      description:
+        "Ambil budgeting bulanan user: total rencana, pengeluaran aktual, sisa atau over budget, dan daftar transaksi yang direncanakan (maksimal 20). Isi month kosong untuk bulan berjalan.",
       parameters: {
         type: "object",
         properties: {
@@ -376,6 +448,8 @@ const executeTool = async (userId: string, call: AIChatToolCall) => {
     switch (call.function.name) {
       case "get_summary":
         return await getSummary(userId, summarySchema.parse(rawArgs));
+      case "get_budget":
+        return await getBudget(userId, budgetSchema.parse(rawArgs));
       case "get_category_breakdown":
         return await getCategoryBreakdown(
           userId,
@@ -402,6 +476,8 @@ const summarizeResult = (result: unknown) => {
   if (typeof result !== "object" || result === null) return "ok";
   const value = result as Record<string, unknown>;
   if ("error" in value) return String(value.error);
+  if (typeof value.plannedAmount === "number")
+    return `${value.itemCount ?? 0} item budget`;
   if (Array.isArray(value.categories))
     return `${value.categories.length} kategori`;
   if (Array.isArray(value.transactions))
@@ -451,7 +527,8 @@ Cara menjawab:
 Aturan data:
 - Gunakan tool untuk mengambil data user. Jangan mengarang angka, kategori, atau transaksi.
 - Selalu sebutkan periode data yang dipakai. Jika pertanyaan tidak menyebut periode, gunakan bulan berjalan.
-- Jika data kosong, katakan bahwa belum ada transaksi pada periode tersebut.
+- Kalau pertanyaan menyangkut budgeting, panggil get_budget. Bedakan rencana (plannedAmount) dari pengeluaran nyata (actualExpense).
+- Jika data kosong, katakan bahwa data transaksi atau budgeting pada periode tersebut memang belum ada.
 - Jangan menyebut nama tool, JSON, atau proses internal. Jangan memberi nasihat investasi/saham spesifik.
 - Semua nominal dalam Rupiah.`;
 };

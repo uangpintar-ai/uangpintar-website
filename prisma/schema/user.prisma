@@ -20,6 +20,7 @@ model User {
   aiChatSessions        AIChatSession[]
   aiAnalysisSessions    AIAnalysisSession[]
   payments              Payment[]
+  budgets               Budget[]
 
   @@map("users")
 }

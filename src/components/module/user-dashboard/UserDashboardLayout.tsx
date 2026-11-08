@@ -10,6 +10,7 @@ import {
   Home,
   LogOut,
   NotebookPen,
+  PiggyBank,
   Receipt,
   Sparkles,
   Tags,
@@ -42,6 +43,7 @@ const bottomNavItems = [
 const moreNavItems = [
   { label: "Dompet", href: "/user/wallets", icon: Wallet },
   { label: "Kategori", href: "/user/categories", icon: Tags },
+  { label: "Budgeting", href: "/user/budgeting", icon: PiggyBank },
   {
     label: "Analisis AI",
     href: "/user/analysis",
@@ -58,6 +60,9 @@ const UserDashboardLayout = ({ children }: Props) => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const matchesMorePath = (href: string) =>
+    pathname === href ||
+    (href === "/user/budgeting" && pathname.startsWith("/user/budgeting/"));
 
   return (
     <SessionProvider>
@@ -130,7 +135,7 @@ const UserDashboardLayout = ({ children }: Props) => {
               type="button"
               className={cn(
                 "flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors",
-                moreNavItems.some((item) => pathname === item.href)
+                moreNavItems.some((item) => matchesMorePath(item.href))
                   ? "text-dl-primary"
                   : "text-dl-muted hover:text-dl-foreground",
               )}
@@ -146,7 +151,7 @@ const UserDashboardLayout = ({ children }: Props) => {
             className="w-48 p-1.5"
           >
             {moreNavItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = matchesMorePath(item.href);
               return (
                 <Link
                   key={item.href}

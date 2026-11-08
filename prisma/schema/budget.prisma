@@ -1,0 +1,26 @@
+model Budget {
+  id        String       @id @default(uuid())
+  userId    String
+  month     String
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     BudgetItem[]
+
+  @@unique([userId, month])
+  @@index([userId])
+  @@map("budgets")
+}
+
+model BudgetItem {
+  id        String   @id @default(uuid())
+  budgetId  String
+  name      String
+  amount    Float    @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  budget    Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@index([budgetId])
+  @@map("budget_items")
+}

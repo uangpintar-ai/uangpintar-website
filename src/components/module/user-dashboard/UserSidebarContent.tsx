@@ -14,6 +14,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  PiggyBank,
   Tags,
   Wallet,
 } from "lucide-react";
@@ -34,6 +35,7 @@ const navItems = [
   { label: "Beranda", href: "/user/dashboard", icon: Home },
   { label: "Dompet", href: "/user/wallets", icon: Wallet },
   { label: "Kategori", href: "/user/categories", icon: Tags },
+  { label: "Budgeting", href: "/user/budgeting", icon: PiggyBank },
   {
     label: "Catat Manual",
     href: "/user/manual-transaction",
@@ -112,7 +114,10 @@ const UserSidebarContent = ({
 
       <nav className="flex flex-1 flex-col gap-1.5 px-3 pt-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive =
+            pathname === item.href ||
+            (item.href === "/user/budgeting" &&
+              pathname.startsWith("/user/budgeting/"));
           return (
             <Link
               key={item.href}

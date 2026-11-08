@@ -38,8 +38,8 @@ type SessionItem = {
 const suggestions = [
   "Bulan ini boros di mana?",
   "Bandingkan bulan ini dengan bulan lalu",
+  "Evaluasi budgeting bulan ini",
   "Berapa sisa saldo saya?",
-  "Beri saran hemat untuk bulan ini",
 ];
 
 type SessionListProps = {
@@ -286,8 +286,8 @@ const AnalysisChat = () => {
                 <Bot className="h-6 w-6 text-dl-primary" />
               </div>
               <p className="max-w-sm text-sm text-dl-muted">
-                Tanyakan apa saja tentang pemasukan, pengeluaran, kategori, atau
-                saldo kamu. AI akan mengambil data yang relevan.
+                Tanyakan apa saja tentang pemasukan, pengeluaran, budgeting,
+                kategori, atau saldo kamu. AI akan mengambil data yang relevan.
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 {suggestions.map((suggestion) => (
